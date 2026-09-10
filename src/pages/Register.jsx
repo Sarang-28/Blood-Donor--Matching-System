@@ -10,16 +10,18 @@ import {
   MenuItem,
   ToggleButton,
   ToggleButtonGroup,
+  CircularProgress,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import PersonalInjuryIcon from "@mui/icons-material/PersonalInjury";
-import VolunteerActivismIcon from "@mui/icons-material/VolunteerActivism";
+import BloodtypeIcon from "@mui/icons-material/Bloodtype";
 
 import LoginButton from "../components/LoginButton";
+import { useAuth } from "../context/AuthContext";
 
 const ROLES = [
   {
@@ -38,19 +40,49 @@ const ROLES = [
     icon: <PersonalInjuryIcon />,
   },
   {
-    value: "ngo",
-    label: "NGO",
-    icon: <VolunteerActivismIcon />,
+    value: "blood_bank",
+    label: "Blood Bank",
+    icon: <BloodtypeIcon />,
   },
 ];
 
 function Register() {
   const navigate = useNavigate();
+  const { register } = useAuth();
 
   const [role, setRole] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = (e) => {
+  // Form state
+  const [formData, setFormData] = useState({
+    fullName: "",
+    organizationName: "",
+    email: "",
+    password: "",
+    phone: "",
+    bloodGroup: "O+",
+    lastDonationDate: "",
+    location: "Pune, Maharashtra",
+    // Hospital
+    hospitalAddress: "",
+    hospitalRegistrationNumber: "",
+    emergencyContact: "",
+    // Patient
+    patientAddress: "",
+    medicalCondition: "",
+    // Blood Bank
+    bloodBankAddress: "",
+    licenseNumber: "",
+    directorName: "",
+    operatingHours: "24/7",
+  });
+
+  const handleChange = (field) => (e) => {
+    setFormData({ ...formData, [field]: e.target.value });
+  };
+
+  const handleRegister = async (e) => {
     e.preventDefault();
 
     if (!role) {
@@ -58,8 +90,30 @@ function Register() {
       return;
     }
 
-    setError("");
-    navigate("/");
+    if (!formData.email || !formData.password || !formData.phone) {
+      setError("Please fill in all mandatory account credentials.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const payload = {
+        ...formData,
+        role,
+      };
+
+      const result = await register(payload);
+      const userRole = result.user.role;
+      navigate(`/dashboard/${userRole}`);
+    } catch (err) {
+      console.error("Registration failed:", err);
+      const msg = err.response?.data?.message || err.message;
+      setError(msg || "Registration failed. Please review your details and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -72,7 +126,7 @@ function Register() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        py: 4,
+        py: 6,
       }}
     >
       <Container maxWidth="sm">
@@ -108,7 +162,7 @@ function Register() {
                 mb: 3,
               }}
             >
-              Create your account
+              Join the Emergency Blood Donor Network
             </Typography>
 
             {error && (
@@ -197,25 +251,36 @@ function Register() {
                 animate={{ opacity: 1, y: 0 }}
                 onSubmit={handleRegister}
               >
-                {/* COMMON FIELDS */}
-
+                {/* COMMON ACCOUNT FIELDS */}
                 <TextField
                   fullWidth
                   label={
-                    role === "hospital" || role === "ngo"
-                      ? "Organization Name"
+                    role === "hospital" || role === "blood_bank"
+                      ? "Institution / Organization Name"
                       : "Full Name"
                   }
                   margin="normal"
                   required
+                  value={
+                    role === "hospital" || role === "blood_bank"
+                      ? formData.organizationName
+                      : formData.fullName
+                  }
+                  onChange={
+                    role === "hospital" || role === "blood_bank"
+                      ? handleChange("organizationName")
+                      : handleChange("fullName")
+                  }
                 />
 
                 <TextField
                   fullWidth
-                  label="Email"
+                  label="Email Address"
                   type="email"
                   margin="normal"
                   required
+                  value={formData.email}
+                  onChange={handleChange("email")}
                 />
 
                 <TextField
@@ -224,18 +289,21 @@ function Register() {
                   label="Password"
                   margin="normal"
                   required
+                  value={formData.password}
+                  onChange={handleChange("password")}
                 />
 
                 <TextField
                   fullWidth
-                  label="Phone Number"
+                  label="Contact Phone Number"
                   type="tel"
                   margin="normal"
                   required
+                  value={formData.phone}
+                  onChange={handleChange("phone")}
                 />
 
                 {/* DONOR FIELDS */}
-
                 {role === "donor" && (
                   <>
                     <TextField
@@ -243,71 +311,70 @@ function Register() {
                       select
                       label="Blood Group"
                       margin="normal"
-                      defaultValue=""
+                      value={formData.bloodGroup}
+                      onChange={handleChange("bloodGroup")}
                       required
                     >
-                      {[
-                        "A+",
-                        "A-",
-                        "B+",
-                        "B-",
-                        "AB+",
-                        "AB-",
-                        "O+",
-                        "O-",
-                      ].map((group) => (
-                        <MenuItem key={group} value={group}>
-                          {group}
-                        </MenuItem>
-                      ))}
+                      {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
+                        (group) => (
+                          <MenuItem key={group} value={group}>
+                            {group}
+                          </MenuItem>
+                        )
+                      )}
                     </TextField>
 
                     <TextField
-  fullWidth
-  type="date"
-  label="Last Donation Date"
-  margin="normal"
-  required
-  slotProps={{
-    inputLabel: {
-      shrink: true,
-    },
-  }}
-/>
+                      fullWidth
+                      type="date"
+                      label="Last Donation Date (if any)"
+                      margin="normal"
+                      value={formData.lastDonationDate}
+                      onChange={handleChange("lastDonationDate")}
+                      slotProps={{
+                        inputLabel: {
+                          shrink: true,
+                        },
+                      }}
+                    />
 
                     <TextField
                       fullWidth
-                      label="Current Location"
-                      placeholder="Enter your city / area"
+                      label="Current Location / Area"
+                      placeholder="e.g. Pimpri, Pune"
                       margin="normal"
                       required
+                      value={formData.location}
+                      onChange={handleChange("location")}
                     />
                   </>
                 )}
 
                 {/* PATIENT FIELDS */}
-
                 {role === "patient" && (
                   <>
                     <TextField
                       fullWidth
-                      label="Current Location"
-                      placeholder="Enter your city / area"
+                      label="Residential Address / Location"
+                      placeholder="e.g. Pune, Maharashtra"
                       margin="normal"
                       required
+                      value={formData.patientAddress}
+                      onChange={handleChange("patientAddress")}
                     />
 
                     <TextField
                       fullWidth
-                      label="Emergency Contact"
+                      label="Emergency Contact Phone"
                       type="tel"
                       margin="normal"
+                      value={formData.emergencyContact}
+                      onChange={handleChange("emergencyContact")}
                     />
                   </>
                 )}
 
                 {/* HOSPITAL FIELDS */}
-
                 {role === "hospital" && (
                   <>
                     <TextField
@@ -317,42 +384,68 @@ function Register() {
                       rows={2}
                       margin="normal"
                       required
+                      value={formData.hospitalAddress}
+                      onChange={handleChange("hospitalAddress")}
                     />
 
                     <TextField
                       fullWidth
-                      label="Hospital Registration Number"
+                      label="Hospital License / Registration Number"
                       margin="normal"
                       required
+                      value={formData.hospitalRegistrationNumber}
+                      onChange={handleChange("hospitalRegistrationNumber")}
                     />
                   </>
                 )}
 
-                {/* NGO FIELDS */}
-
-                {role === "ngo" && (
+                {/* BLOOD BANK FIELDS */}
+                {role === "blood_bank" && (
                   <>
                     <TextField
                       fullWidth
-                      label="NGO Address"
+                      label="Blood Bank Facility Address"
                       multiline
                       rows={2}
                       margin="normal"
                       required
+                      value={formData.bloodBankAddress}
+                      onChange={handleChange("bloodBankAddress")}
                     />
 
                     <TextField
                       fullWidth
-                      label="NGO Registration Number"
+                      label="Blood Bank Registration / License No"
                       margin="normal"
                       required
+                      value={formData.licenseNumber}
+                      onChange={handleChange("licenseNumber")}
+                    />
+
+                    <TextField
+                      fullWidth
+                      label="Director / Medical Officer In-Charge"
+                      margin="normal"
+                      value={formData.directorName}
+                      onChange={handleChange("directorName")}
+                    />
+
+                    <TextField
+                      fullWidth
+                      label="Operating Hours"
+                      placeholder="e.g. 24/7 or 8 AM - 8 PM"
+                      margin="normal"
+                      value={formData.operatingHours}
+                      onChange={handleChange("operatingHours")}
                     />
                   </>
                 )}
 
-                <LoginButton type="submit">
-                  Register
-                </LoginButton>
+                <Box sx={{ mt: 3 }}>
+                  <LoginButton type="submit" disabled={loading}>
+                    {loading ? <CircularProgress size={24} color="inherit" /> : "Complete Registration"}
+                  </LoginButton>
+                </Box>
               </Box>
             )}
 
@@ -368,6 +461,15 @@ function Register() {
                 Select your role above to continue
               </Typography>
             )}
+
+            <Box sx={{ mt: 3, textAlign: "center" }}>
+              <Typography variant="body2" color="text.secondary">
+                Already registered?{" "}
+                <Link to="/" style={{ color: "#D32F2F", fontWeight: 600, textDecoration: "none" }}>
+                  Log In
+                </Link>
+              </Typography>
+            </Box>
           </CardContent>
         </Card>
       </Container>

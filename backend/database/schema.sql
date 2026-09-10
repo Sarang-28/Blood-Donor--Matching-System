@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- 2. ENUM TYPES
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-        CREATE TYPE user_role AS ENUM ('donor', 'hospital', 'patient', 'ngo', 'admin');
+        CREATE TYPE user_role AS ENUM ('donor', 'hospital', 'patient', 'blood_bank', 'admin');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'blood_group_type') THEN
         CREATE TYPE blood_group_type AS ENUM ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-');
@@ -96,15 +96,15 @@ CREATE TABLE IF NOT EXISTS patients (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 7. NGOS TABLE
-CREATE TABLE IF NOT EXISTS ngos (
+-- 7. BLOOD BANKS TABLE
+CREATE TABLE IF NOT EXISTS blood_banks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    ngo_name VARCHAR(255) NOT NULL,
-    registration_number VARCHAR(100) UNIQUE NOT NULL,
-    coordinator_name VARCHAR(150) NOT NULL,
+    blood_bank_name VARCHAR(255) NOT NULL,
+    license_number VARCHAR(100) UNIQUE NOT NULL,
+    director_name VARCHAR(150) NOT NULL,
     contact_number VARCHAR(20) NOT NULL,
-    areas_of_operation TEXT,
+    operating_hours VARCHAR(100) DEFAULT '24/7',
     address TEXT NOT NULL,
     geom GEOMETRY(Point, 4326) NOT NULL,
     verification_status verification_status DEFAULT 'pending',
@@ -113,11 +113,21 @@ CREATE TABLE IF NOT EXISTS ngos (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 7.1 BLOOD INVENTORY TABLE
+CREATE TABLE IF NOT EXISTS blood_inventory (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    blood_bank_id UUID NOT NULL REFERENCES blood_banks(id) ON DELETE CASCADE,
+    blood_group blood_group_type NOT NULL,
+    units_available INT NOT NULL DEFAULT 0 CHECK (units_available >= 0),
+    last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(blood_bank_id, blood_group)
+);
+
 -- 8. BLOOD REQUESTS TABLE
 CREATE TABLE IF NOT EXISTS blood_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     requester_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    requester_role user_role NOT NULL CHECK (requester_role IN ('hospital', 'patient', 'ngo')),
+    requester_role user_role NOT NULL CHECK (requester_role IN ('hospital', 'patient', 'blood_bank', 'donor')),
     patient_name VARCHAR(150) NOT NULL,
     hospital_name VARCHAR(255) NOT NULL,
     blood_group blood_group_type NOT NULL,
@@ -154,7 +164,8 @@ CREATE TABLE IF NOT EXISTS donations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     blood_request_id UUID REFERENCES blood_requests(id) ON DELETE SET NULL,
     donor_id UUID NOT NULL REFERENCES donors(id) ON DELETE RESTRICT,
-    hospital_id UUID NOT NULL REFERENCES hospitals(id) ON DELETE RESTRICT,
+    hospital_id UUID REFERENCES hospitals(id) ON DELETE RESTRICT,
+    blood_bank_id UUID REFERENCES blood_banks(id) ON DELETE RESTRICT,
     units_donated INT NOT NULL DEFAULT 1,
     donation_date DATE NOT NULL DEFAULT CURRENT_DATE,
     certificate_number VARCHAR(100) UNIQUE,
@@ -178,7 +189,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE TABLE IF NOT EXISTS verifications_log (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     admin_user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    target_type VARCHAR(20) NOT NULL CHECK (target_type IN ('hospital', 'ngo')),
+    target_type VARCHAR(20) NOT NULL CHECK (target_type IN ('hospital', 'blood_bank')),
     target_id UUID NOT NULL,
     action verification_status NOT NULL,
     remarks TEXT,
@@ -189,7 +200,7 @@ CREATE TABLE IF NOT EXISTS verifications_log (
 CREATE INDEX IF NOT EXISTS idx_donors_geom ON donors USING GIST (geom);
 CREATE INDEX IF NOT EXISTS idx_hospitals_geom ON hospitals USING GIST (geom);
 CREATE INDEX IF NOT EXISTS idx_blood_requests_geom ON blood_requests USING GIST (geom);
-CREATE INDEX IF NOT EXISTS idx_ngos_geom ON ngos USING GIST (geom);
+CREATE INDEX IF NOT EXISTS idx_blood_banks_geom ON blood_banks USING GIST (geom);
 
 -- 14. B-TREE INDEXES FOR PERFORMANCE
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

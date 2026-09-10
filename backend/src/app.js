@@ -1,5 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 const env = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./middlewares/errorMiddleware');
 
@@ -8,7 +11,7 @@ const authRoutes = require('./routes/authRoutes');
 const donorRoutes = require('./routes/donorRoutes');
 const hospitalRoutes = require('./routes/hospitalRoutes');
 const patientRoutes = require('./routes/patientRoutes');
-const ngoRoutes = require('./routes/ngoRoutes');
+const bloodBankRoutes = require('./routes/bloodBankRoutes');
 const bloodRequestRoutes = require('./routes/bloodRequestRoutes');
 const matchingRoutes = require('./routes/matchingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
@@ -16,7 +19,13 @@ const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
-// Middlewares
+// Security HTTP headers
+app.use(helmet());
+
+// Request logging
+app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
+
+// CORS configuration
 app.use(cors({
     origin: env.clientUrl || 'http://localhost:5173',
     credentials: true,
@@ -24,8 +33,36 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Rate limiting: general API limiter
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 300, // limit each IP to 300 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: 'Too many requests from this IP, please try again after 15 minutes.',
+    },
+});
+app.use('/api', apiLimiter);
+
+// Stricter rate limiting for authentication routes
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30, // 30 attempts per 15 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: 'Too many login attempts. Please wait 15 minutes before trying again.',
+    },
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+// Body parser with payload limits
+app.use(express.json({ limit: '20kb' }));
+app.use(express.urlencoded({ extended: true, limit: '20kb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -33,6 +70,7 @@ app.get('/api/health', (req, res) => {
         status: 'online',
         timestamp: new Date().toISOString(),
         service: 'Hyperlocal Blood Donor Matching Backend API',
+        environment: env.nodeEnv,
     });
 });
 
@@ -41,7 +79,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/donors', donorRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/patients', patientRoutes);
-app.use('/api/ngos', ngoRoutes);
+app.use('/api/blood-banks', bloodBankRoutes);
+// Backward compatibility alias for ngo endpoint
+app.use('/api/ngos', bloodBankRoutes);
 app.use('/api/blood-requests', bloodRequestRoutes);
 app.use('/api/matches', matchingRoutes);
 app.use('/api/admin', adminRoutes);

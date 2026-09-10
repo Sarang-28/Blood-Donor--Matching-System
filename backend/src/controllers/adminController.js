@@ -39,15 +39,15 @@ const getStats = async (req, res, next) => {
                 WHERE h.verification_status = 'pending'
                 UNION ALL
                 SELECT 
-                    'ngo' AS type,
-                    n.id,
-                    n.ngo_name AS name,
-                    n.registration_number AS "registrationNo",
-                    n.address,
-                    n.contact_number AS phone,
-                    n.created_at AS "createdAt"
-                FROM ngos n
-                WHERE n.verification_status = 'pending'
+                    'blood_bank' AS type,
+                    b.id,
+                    b.blood_bank_name AS name,
+                    b.license_number AS "registrationNo",
+                    b.address,
+                    b.contact_number AS phone,
+                    b.created_at AS "createdAt"
+                FROM blood_banks b
+                WHERE b.verification_status = 'pending'
                 ORDER BY "createdAt" DESC
                 LIMIT 10;
             `),
@@ -181,11 +181,12 @@ const updateUserStatus = async (req, res, next) => {
 const verifyInstitution = async (req, res, next) => {
     const client = await db.getClient();
     try {
-        const { type, id } = req.params; // type: 'hospital' | 'ngo'
+        const { type, id } = req.params; // type: 'hospital' | 'blood_bank' (or 'ngo')
         const { action, remarks } = req.body; // action: 'verified' | 'rejected'
+        const normalizedType = type === 'ngo' ? 'blood_bank' : type;
 
-        if (!['hospital', 'ngo'].includes(type)) {
-            return apiError(res, 'Type must be hospital or ngo', 400);
+        if (!['hospital', 'blood_bank'].includes(normalizedType)) {
+            return apiError(res, 'Type must be hospital or blood_bank', 400);
         }
         if (!['verified', 'rejected'].includes(action)) {
             return apiError(res, 'Action must be verified or rejected', 400);
@@ -196,7 +197,7 @@ const verifyInstitution = async (req, res, next) => {
         let institutionName = '';
         let targetUserId = null;
 
-        if (type === 'hospital') {
+        if (normalizedType === 'hospital') {
             const updateHosp = await client.query(`
                 UPDATE hospitals
                 SET 
@@ -214,29 +215,29 @@ const verifyInstitution = async (req, res, next) => {
             institutionName = updateHosp.rows[0].hospital_name;
             targetUserId = updateHosp.rows[0].user_id;
         } else {
-            const updateNgo = await client.query(`
-                UPDATE ngos
+            const updateBB = await client.query(`
+                UPDATE blood_banks
                 SET 
                     verification_status = $1,
                     verified_at = CASE WHEN $1 = 'verified' THEN CURRENT_TIMESTAMP ELSE NULL END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = $2
-                RETURNING ngo_name, user_id;
+                RETURNING blood_bank_name, user_id;
             `, [action, id]);
 
-            if (updateNgo.rows.length === 0) {
+            if (updateBB.rows.length === 0) {
                 await client.query('ROLLBACK');
-                return apiError(res, 'NGO not found', 404);
+                return apiError(res, 'Blood Bank not found', 404);
             }
-            institutionName = updateNgo.rows[0].ngo_name;
-            targetUserId = updateNgo.rows[0].user_id;
+            institutionName = updateBB.rows[0].blood_bank_name;
+            targetUserId = updateBB.rows[0].user_id;
         }
 
         // Log admin verification audit
         await client.query(`
             INSERT INTO verifications_log (admin_user_id, target_type, target_id, action, remarks)
             VALUES ($1, $2, $3, $4, $5);
-        `, [req.user.id, type, id, action, remarks || null]);
+        `, [req.user.id, normalizedType, id, action, remarks || null]);
 
         await client.query('COMMIT');
 

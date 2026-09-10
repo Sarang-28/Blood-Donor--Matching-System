@@ -22,11 +22,23 @@ import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import HistoryIcon from "@mui/icons-material/History";
 import { motion } from "framer-motion";
 
-import Sidebar from "../components/Sidebar";
+import DonorDashboard from "./DonorDashboard";
+import HospitalDashboard from "./HospitalDashboard";
+import BloodBankDashboard from "./BloodBankDashboard";
 
 const MotionCard = motion.create(Card);
 
 function Dashboard({ role }) {
+    if (role === "donor") {
+        return <DonorDashboard />;
+    }
+    if (role === "hospital") {
+        return <HospitalDashboard />;
+    }
+    if (role === "blood_bank" || role === "ngo") {
+        return <BloodBankDashboard role={role} />;
+    }
+
     const roleData = {
         donor: {
             title: "Donor Dashboard",

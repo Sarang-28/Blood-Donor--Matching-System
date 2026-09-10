@@ -8,6 +8,8 @@ import {
   Toolbar,
   Typography,
   Box,
+  Divider,
+  Button,
 } from "@mui/material";
 import { motion } from "framer-motion";
 
@@ -16,13 +18,16 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import BloodtypeIcon from "@mui/icons-material/Bloodtype";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import PersonIcon from "@mui/icons-material/Person";
+import LogoutIcon from "@mui/icons-material/Logout";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const drawerWidth = 240;
 
 function Sidebar({ role }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const menuItems = [
     { text: "Dashboard", pathId: "dashboard", icon: <DashboardIcon /> },
@@ -49,10 +54,11 @@ function Sidebar({ role }) {
       ]
       : []),
 
-    ...(role === "ngo"
+    ...(role === "blood_bank" || role === "ngo"
       ? [
-        { text: "Donors", pathId: "donors", icon: <FavoriteIcon /> },
+        { text: "Inventory", pathId: "inventory", icon: <BloodtypeIcon /> },
         { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },
+        { text: "Donors", pathId: "donors", icon: <FavoriteIcon /> },
         { text: "Hospitals", pathId: "hospitals", icon: <LocalHospitalIcon /> },
       ]
       : []),
@@ -142,6 +148,37 @@ function Sidebar({ role }) {
           );
         })}
       </List>
+
+      <Box sx={{ mt: "auto", p: 2 }}>
+        <Divider sx={{ mb: 2 }} />
+        {user && (
+          <Box sx={{ mb: 1.5, px: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+              Logged in as
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700, textTransform: "capitalize", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {user.email}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 600, textTransform: "uppercase" }}>
+              Role: {user.role?.replace("_", " ")}
+            </Typography>
+          </Box>
+        )}
+        <Button
+          fullWidth
+          variant="outlined"
+          color="error"
+          size="small"
+          startIcon={<LogoutIcon />}
+          onClick={() => {
+            logout();
+            navigate("/");
+          }}
+          sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+        >
+          Sign Out
+        </Button>
+      </Box>
     </Drawer>
   );
 }

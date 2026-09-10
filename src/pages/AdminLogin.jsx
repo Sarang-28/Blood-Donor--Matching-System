@@ -18,24 +18,36 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LockIcon from "@mui/icons-material/Lock";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
-
-const DUMMY_USERNAME = "admin";
-const DUMMY_PASSWORD = "123";
+import { useAuth } from "../context/AuthContext";
 
 function AdminLogin() {
   const navigate = useNavigate();
+  const { adminLogin } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (username === DUMMY_USERNAME && password === DUMMY_PASSWORD) {
-      setError("");
+    setError("");
+
+    if (!username.trim() || !password) {
+      setError("Please enter your admin email/username and password.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await adminLogin({ email: username.trim(), password });
       navigate("/admin");
-    } else {
-      setError("Invalid admin credentials.");
+    } catch (err) {
+      console.error("Admin login failed:", err);
+      const msg = err.response?.data?.message || err.message;
+      setError(msg || "Invalid admin credentials.");
+    } finally {
+      setLoading(false);
     }
   };
 

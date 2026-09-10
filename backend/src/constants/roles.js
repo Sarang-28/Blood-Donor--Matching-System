@@ -2,11 +2,12 @@ const ROLES = {
     DONOR: 'donor',
     HOSPITAL: 'hospital',
     PATIENT: 'patient',
-    NGO: 'ngo',
+    BLOOD_BANK: 'blood_bank',
+    NGO: 'blood_bank', // Backward compatibility alias
     ADMIN: 'admin',
 };
 
-const ALL_ROLES = Object.values(ROLES);
+const ALL_ROLES = ['donor', 'hospital', 'patient', 'blood_bank', 'admin'];
 
 module.exports = {
     ROLES,

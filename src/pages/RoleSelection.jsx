@@ -35,10 +35,10 @@ function RoleSelection() {
       path: "/dashboard/patient",
     },
     {
-      title: "NGO",
-      icon: "🤝",
-      image: "/role_images/ngo.jpg",
-      path: "/dashboard/ngo",
+      title: "Blood Bank",
+      icon: "🧪",
+      image: "/role_images/hospital.jpg",
+      path: "/dashboard/blood_bank",
     },
   ];
 

@@ -15,13 +15,19 @@ import NotificationsIcon from "@mui/icons-material/Notifications";
 import SearchIcon from "@mui/icons-material/Search";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import NotificationMenu from "./NotificationMenu";
 
 const drawerWidth = 240;
 
 function Navbar() {
   const { role } = useParams();
   const navigate = useNavigate();
-  const formattedRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : "";
+  const { user, profile, logout } = useAuth();
+  const effectiveRole = role || user?.role || "";
+  const formattedRole = effectiveRole ? effectiveRole.replace("_", " ").toUpperCase() : "";
+  const displayName = profile?.full_name || profile?.hospital_name || profile?.blood_bank_name || user?.email?.split('@')[0] || "User";
+  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   return (
     <AppBar
@@ -87,23 +93,8 @@ function Navbar() {
 
         {/* Right Side */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
-          <IconButton>
-            <Badge
-              badgeContent={3}
-              color="error"
-              sx={{
-                "& .MuiBadge-badge": {
-                  animation: "pulseBadge 1.8s ease-in-out infinite",
-                },
-                "@keyframes pulseBadge": {
-                  "0%, 100%": { transform: "scale(1)" },
-                  "50%": { transform: "scale(1.2)" },
-                },
-              }}
-            >
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
+          {/* Notification Bell Menu */}
+          <NotificationMenu />
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}>
@@ -112,13 +103,14 @@ function Navbar() {
                   bgcolor: "primary.main",
                   cursor: "pointer",
                   boxShadow: "0 4px 14px rgba(229, 56, 77, 0.35)",
+                  fontWeight: 700,
                 }}
               >
-                S
+                {avatarLetter}
               </Avatar>
             </motion.div>
             <Box>
-              <Typography fontWeight="bold" sx={{ lineHeight: 1.2 }}>Sarang</Typography>
+              <Typography fontWeight="bold" sx={{ lineHeight: 1.2 }}>{displayName}</Typography>
               {formattedRole && (
                 <Typography variant="caption" color="text.secondary">
                   {formattedRole}
@@ -127,8 +119,14 @@ function Navbar() {
             </Box>
           </Box>
 
-          <Tooltip title="Logout">
-            <IconButton onClick={() => navigate("/")} color="error">
+          <Tooltip title="Sign Out">
+            <IconButton
+              onClick={() => {
+                logout();
+                navigate("/");
+              }}
+              color="error"
+            >
               <LogoutIcon />
             </IconButton>
           </Tooltip>

@@ -19,7 +19,10 @@ const errorHandler = (err, req, res, next) => {
     }
 
     const statusCode = err.statusCode || 500;
-    const message = err.message || 'Internal Server Error';
+    let message = err.message || 'Internal Server Error';
+    if (statusCode === 500 && process.env.NODE_ENV === 'production') {
+        message = 'An unexpected error occurred. Please contact system support.';
+    }
     return apiError(res, message, statusCode);
 };
 

@@ -18,7 +18,7 @@ const router = express.Router();
 router.post(
     '/',
     authenticateToken,
-    authorizeRoles(ROLES.HOSPITAL, ROLES.PATIENT, ROLES.NGO, ROLES.ADMIN),
+    authorizeRoles(ROLES.HOSPITAL, ROLES.PATIENT, ROLES.BLOOD_BANK, ROLES.NGO, ROLES.ADMIN),
     [
         body('bloodGroup')
             .isIn(ALL_BLOOD_GROUPS)
@@ -64,7 +64,7 @@ router.get('/:id', authenticateToken, bloodRequestController.getRequestById);
 router.patch(
     '/:id/status',
     authenticateToken,
-    authorizeRoles(ROLES.HOSPITAL, ROLES.PATIENT, ROLES.NGO, ROLES.ADMIN),
+    authorizeRoles(ROLES.HOSPITAL, ROLES.PATIENT, ROLES.BLOOD_BANK, ROLES.NGO, ROLES.ADMIN),
     [
         body('status').notEmpty().withMessage('Status is required'),
         validate,

@@ -22,26 +22,41 @@ import {
 } from "@mui/icons-material";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-
-const DUMMY_USERNAME = "admin";
-const DUMMY_PASSWORD = "123";
+import { useAuth } from "../context/AuthContext";
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
 
-    if (username === DUMMY_USERNAME && password === DUMMY_PASSWORD) {
-      setError("");
-      navigate("/roles");
-    } else {
-      setError("Invalid username or password.");
+    if (!username.trim() || !password) {
+      setError("Please enter your email and password.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { user } = await login({ email: username.trim(), password });
+      if (user.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate(`/dashboard/${user.role}`);
+      }
+    } catch (err) {
+      console.error("Login failed:", err);
+      const serverMsg = err.response?.data?.message || err.message;
+      setError(serverMsg || "Invalid credentials. Please verify your email and password.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -357,8 +372,9 @@ function Login() {
                         "0 14px 30px rgba(229,56,77,0.32)",
                     },
                   }}
+                  disabled={loading}
                 >
-                  Login
+                  {loading ? "Signing In..." : "Login"}
                 </Button>
               </Box>
 

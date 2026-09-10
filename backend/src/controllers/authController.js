@@ -49,7 +49,12 @@ const register = async (req, res, next) => {
             patientAddress,
             medicalCondition,
             attendingDoctor,
-            // NGO specific
+            // Blood Bank specific (and NGO backward compatibility)
+            bloodBankName,
+            licenseNumber,
+            directorName,
+            operatingHours,
+            bloodBankAddress,
             ngoAddress,
             ngoRegistrationNumber,
             coordinatorName,
@@ -59,6 +64,8 @@ const register = async (req, res, next) => {
             latitude,
             longitude,
         } = req.body;
+
+        const effectiveRole = (role === 'ngo' || role === ROLES.NGO) ? ROLES.BLOOD_BANK : role;
 
         // Check if user already exists
         const existingCheck = await client.query(
@@ -84,7 +91,7 @@ const register = async (req, res, next) => {
             `INSERT INTO users (email, password_hash, role, phone)
              VALUES ($1, $2, $3, $4)
              RETURNING id, email, role, phone, is_active, created_at;`,
-            [email.toLowerCase().trim(), passwordHash, role, phone]
+            [email.toLowerCase().trim(), passwordHash, effectiveRole, phone]
         );
         const newUser = userInsert.rows[0];
 
@@ -169,33 +176,48 @@ const register = async (req, res, next) => {
                 ]
             );
             profileData = patientInsert.rows[0];
-        } else if (role === ROLES.NGO) {
-            const name = organizationName || fullName || 'Community Health NGO';
-            const regNo = ngoRegistrationNumber || `REG-${Date.now()}`;
-            const address = ngoAddress || locationName;
-            const ngoInsert = await client.query(
-                `INSERT INTO ngos (
-                    user_id, ngo_name, registration_number, coordinator_name, contact_number,
-                    areas_of_operation, address, geom
+        } else if (effectiveRole === ROLES.BLOOD_BANK) {
+            const name = bloodBankName || organizationName || fullName || 'Regional Blood Bank';
+            const licenseNo = licenseNumber || ngoRegistrationNumber || `BB-${Date.now()}`;
+            const director = directorName || coordinatorName || 'Chief Medical Officer';
+            const contact = contactNumber || phone;
+            const hours = operatingHours || '24/7';
+            const address = bloodBankAddress || ngoAddress || locationName;
+
+            const bbInsert = await client.query(
+                `INSERT INTO blood_banks (
+                    user_id, blood_bank_name, license_number, director_name, contact_number,
+                    operating_hours, address, geom
                 )
                 VALUES (
                     $1, $2, $3, $4, $5, $6, $7,
                     ST_SetSRID(ST_MakePoint($8, $9), 4326)
                 )
-                RETURNING id, ngo_name, registration_number, coordinator_name, contact_number, areas_of_operation, verification_status;`,
+                RETURNING id, blood_bank_name, license_number, director_name, contact_number, operating_hours, address, verification_status;`,
                 [
                     newUser.id,
                     name,
-                    regNo,
-                    coordinatorName || 'Chief Coordinator',
-                    phone,
-                    areasOfOperation || locationName,
+                    licenseNo,
+                    director,
+                    contact,
+                    hours,
                     address,
                     coords.longitude,
                     coords.latitude,
                 ]
             );
-            profileData = ngoInsert.rows[0];
+            profileData = bbInsert.rows[0];
+
+            // Initialize 0 units for all 8 standard blood groups
+            const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+            for (const bg of bloodGroups) {
+                await client.query(
+                    `INSERT INTO blood_inventory (blood_bank_id, blood_group, units_available)
+                     VALUES ($1, $2, 0)
+                     ON CONFLICT DO NOTHING;`,
+                    [profileData.id, bg]
+                );
+            }
         }
 
         await client.query('COMMIT');
@@ -269,8 +291,8 @@ const login = async (req, res, next) => {
         } else if (user.role === ROLES.PATIENT) {
             const p = await db.query('SELECT * FROM patients WHERE user_id = $1', [user.id]);
             profile = p.rows[0] || null;
-        } else if (user.role === ROLES.NGO) {
-            const p = await db.query('SELECT * FROM ngos WHERE user_id = $1', [user.id]);
+        } else if (user.role === ROLES.BLOOD_BANK || user.role === 'blood_bank' || user.role === 'ngo') {
+            const p = await db.query('SELECT * FROM blood_banks WHERE user_id = $1', [user.id]);
             profile = p.rows[0] || null;
         }
 

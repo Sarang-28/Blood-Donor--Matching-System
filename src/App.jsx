@@ -8,73 +8,119 @@ import RoleSelection from "./pages/RoleSelection";
 import BloodRequests from "./pages/BloodRequests";
 import Donors from "./pages/Donors";
 import Profile from "./pages/Profile";
+import Emergency from "./pages/Emergency";
+import BloodBankDashboard from "./pages/BloodBankDashboard";
 
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
+
+const APP_ROLES = ["donor", "hospital", "patient", "blood_bank", "ngo"];
 
 function App() {
   return (
     <Routes>
+      {/* Public Authentication Routes */}
       <Route path="/" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/roles" element={<RoleSelection />} />
-      
-      {/* Admin Routes */}
       <Route path="/admin-login" element={<AdminLogin />} />
-      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/emergency" element={<Emergency />} />
+
+      {/* Admin Route with Protection */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="/dashboard" element={<Navigate to="/roles" replace />} />
-      {["donor", "hospital", "patient", "ngo"].map((role) => (
+
+      {/* Blood Requests per Role */}
+      {APP_ROLES.map((role) => (
         <Route
           key={`blood-requests-${role}`}
           path={`/blood-requests/${role}`}
           element={
-            <>
-              <Navbar />
-              <BloodRequests role={role} />
-            </>
+            <ProtectedRoute>
+              <>
+                <Navbar />
+                <BloodRequests role={role} />
+              </>
+            </ProtectedRoute>
           }
         />
       ))}
 
-      {["hospital", "patient", "ngo"].map((role) => (
+      {/* Donors List per Role */}
+      {["hospital", "patient", "blood_bank", "ngo"].map((role) => (
         <Route
           key={`donors-${role}`}
           path={`/donors/${role}`}
           element={
-            <>
-              <Navbar />
-              <Donors role={role} />
-            </>
+            <ProtectedRoute>
+              <>
+                <Navbar />
+                <Donors role={role} />
+              </>
+            </ProtectedRoute>
           }
         />
       ))}
 
-      {["donor", "hospital", "patient", "ngo"].map((role) => (
+      {/* Dedicated Inventory Route for Blood Banks */}
+      {["blood_bank", "ngo"].map((role) => (
+        <Route
+          key={`inventory-${role}`}
+          path={`/inventory/${role}`}
+          element={
+            <ProtectedRoute allowedRoles={["blood_bank", "ngo", "admin"]}>
+              <>
+                <Navbar />
+                <BloodBankDashboard role={role} />
+              </>
+            </ProtectedRoute>
+          }
+        />
+      ))}
+
+      {/* Dashboard per Role */}
+      {APP_ROLES.map((role) => (
         <Route
           key={`dashboard-${role}`}
           path={`/dashboard/${role}`}
           element={
-            <>
-              <Navbar />
-              <Dashboard role={role} />
-            </>
+            <ProtectedRoute>
+              <>
+                <Navbar />
+                <Dashboard role={role} />
+              </>
+            </ProtectedRoute>
           }
         />
       ))}
 
-      {["donor", "hospital", "patient", "ngo"].map((role) => (
+      {/* Profile per Role */}
+      {APP_ROLES.map((role) => (
         <Route
           key={`profile-${role}`}
           path={`/profile/${role}`}
           element={
-            <>
-              <Navbar />
-              <Profile role={role} />
-            </>
+            <ProtectedRoute>
+              <>
+                <Navbar />
+                <Profile role={role} />
+              </>
+            </ProtectedRoute>
           }
         />
       ))}
+
+      {/* Catch-all fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
