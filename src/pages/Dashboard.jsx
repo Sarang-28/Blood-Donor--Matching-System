@@ -9,7 +9,17 @@ import {
     CardContent,
     Grid,
     Typography,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemAvatar,
+    Avatar,
+    Chip,
+    Button,
+    Divider,
 } from "@mui/material";
+import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
+import HistoryIcon from "@mui/icons-material/History";
 import { motion } from "framer-motion";
 
 import Sidebar from "../components/Sidebar";
@@ -148,6 +158,77 @@ function Dashboard({ role }) {
                             </MotionCard>
                         </Grid>
                     ))}
+                </Grid>
+
+                {/* Bottom Section: Emergency Requests & Recent Activity */}
+                <Grid container spacing={3} sx={{ mt: 1 }}>
+                    {/* Emergency Requests */}
+                    <Grid size={{ xs: 12, md: 8 }}>
+                        <Card sx={{ borderRadius: 3, boxShadow: "0 8px 24px rgba(17,12,46,0.06)", height: "100%" }}>
+                            <CardContent>
+                                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+                                    <Typography variant="h6" fontWeight="bold" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <NotificationsActiveIcon color="error" />
+                                        Urgent Requests
+                                    </Typography>
+                                    <Button variant="text" size="small">View All</Button>
+                                </Box>
+                                <List disablePadding>
+                                    {[1, 2, 3].map((_, idx) => (
+                                        <div key={idx}>
+                                            <ListItem alignItems="flex-start" sx={{ px: 0 }}>
+                                                <ListItemAvatar>
+                                                    <Avatar sx={{ bgcolor: "#FFEbee", color: "error.main", fontWeight: "bold" }}>
+                                                        O+
+                                                    </Avatar>
+                                                </ListItemAvatar>
+                                                <ListItemText
+                                                    primary={<Typography fontWeight="bold">City Care Hospital requires 2 Units</Typography>}
+                                                    secondary="Pimpri, Pune • 10 mins ago"
+                                                />
+                                                <Chip label="Critical" color="error" size="small" />
+                                            </ListItem>
+                                            {idx < 2 && <Divider component="li" />}
+                                        </div>
+                                    ))}
+                                </List>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+
+                    {/* Recent Activity */}
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <Card sx={{ borderRadius: 3, boxShadow: "0 8px 24px rgba(17,12,46,0.06)", height: "100%" }}>
+                            <CardContent>
+                                <Typography variant="h6" fontWeight="bold" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
+                                    <HistoryIcon color="primary" />
+                                    Recent Activity
+                                </Typography>
+                                <List disablePadding>
+                                    <ListItem sx={{ px: 0 }}>
+                                        <ListItemText 
+                                            primary="Rahul Sharma donated blood" 
+                                            secondary="Just now" 
+                                        />
+                                    </ListItem>
+                                    <Divider component="li" />
+                                    <ListItem sx={{ px: 0 }}>
+                                        <ListItemText 
+                                            primary="Match found for Request #102" 
+                                            secondary="2 hours ago" 
+                                        />
+                                    </ListItem>
+                                    <Divider component="li" />
+                                    <ListItem sx={{ px: 0 }}>
+                                        <ListItemText 
+                                            primary="New blood drive in your area" 
+                                            secondary="1 day ago" 
+                                        />
+                                    </ListItem>
+                                </List>
+                            </CardContent>
+                        </Card>
+                    </Grid>
                 </Grid>
             </Box>
         </Box>

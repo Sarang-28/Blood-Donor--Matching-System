@@ -7,15 +7,22 @@ import {
   InputBase,
   Toolbar,
   Typography,
+  Tooltip,
 } from "@mui/material";
 import { motion } from "framer-motion";
 
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import SearchIcon from "@mui/icons-material/Search";
+import LogoutIcon from "@mui/icons-material/Logout";
+import { useParams, useNavigate } from "react-router-dom";
 
 const drawerWidth = 240;
 
 function Navbar() {
+  const { role } = useParams();
+  const navigate = useNavigate();
+  const formattedRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : "";
+
   return (
     <AppBar
       position="fixed"
@@ -79,7 +86,7 @@ function Navbar() {
         </Box>
 
         {/* Right Side */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
           <IconButton>
             <Badge
               badgeContent={3}
@@ -98,19 +105,33 @@ function Navbar() {
             </Badge>
           </IconButton>
 
-          <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}>
-            <Avatar
-              sx={{
-                bgcolor: "primary.main",
-                cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(229, 56, 77, 0.35)",
-              }}
-            >
-              S
-            </Avatar>
-          </motion.div>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}>
+              <Avatar
+                sx={{
+                  bgcolor: "primary.main",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(229, 56, 77, 0.35)",
+                }}
+              >
+                S
+              </Avatar>
+            </motion.div>
+            <Box>
+              <Typography fontWeight="bold" sx={{ lineHeight: 1.2 }}>Sarang</Typography>
+              {formattedRole && (
+                <Typography variant="caption" color="text.secondary">
+                  {formattedRole}
+                </Typography>
+              )}
+            </Box>
+          </Box>
 
-          <Typography fontWeight="bold">Sarang</Typography>
+          <Tooltip title="Logout">
+            <IconButton onClick={() => navigate("/")} color="error">
+              <LogoutIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Toolbar>
     </AppBar>

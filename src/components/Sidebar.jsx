@@ -1,4 +1,4 @@
-import { useState } from "react";
+
 import {
   Drawer,
   List,
@@ -16,46 +16,48 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import BloodtypeIcon from "@mui/icons-material/Bloodtype";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import PersonIcon from "@mui/icons-material/Person";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const drawerWidth = 240;
 
 function Sidebar({ role }) {
-  const [selected, setSelected] = useState("Dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const menuItems = [
-    { text: "Dashboard", icon: <DashboardIcon /> },
+    { text: "Dashboard", pathId: "dashboard", icon: <DashboardIcon /> },
 
     ...(role === "donor"
       ? [
-        { text: "Blood Requests", icon: <BloodtypeIcon /> },
-        { text: "Hospitals", icon: <LocalHospitalIcon /> },
+        { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },
+        { text: "Hospitals", pathId: "hospitals", icon: <LocalHospitalIcon /> },
       ]
       : []),
 
     ...(role === "hospital"
       ? [
-        { text: "Donors", icon: <FavoriteIcon /> },
-        { text: "Blood Requests", icon: <BloodtypeIcon /> },
+        { text: "Donors", pathId: "donors", icon: <FavoriteIcon /> },
+        { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },
       ]
       : []),
 
     ...(role === "patient"
       ? [
-        { text: "Blood Requests", icon: <BloodtypeIcon /> },
-        { text: "Donors", icon: <FavoriteIcon /> },
-        { text: "Hospitals", icon: <LocalHospitalIcon /> },
+        { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },
+        { text: "Donors", pathId: "donors", icon: <FavoriteIcon /> },
+        { text: "Hospitals", pathId: "hospitals", icon: <LocalHospitalIcon /> },
       ]
       : []),
 
     ...(role === "ngo"
       ? [
-        { text: "Donors", icon: <FavoriteIcon /> },
-        { text: "Blood Requests", icon: <BloodtypeIcon /> },
-        { text: "Hospitals", icon: <LocalHospitalIcon /> },
+        { text: "Donors", pathId: "donors", icon: <FavoriteIcon /> },
+        { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },
+        { text: "Hospitals", pathId: "hospitals", icon: <LocalHospitalIcon /> },
       ]
       : []),
 
-    { text: "Profile", icon: <PersonIcon /> },
+    { text: "Profile", pathId: "profile", icon: <PersonIcon /> },
   ];
 
   return (
@@ -82,7 +84,7 @@ function Sidebar({ role }) {
 
       <List sx={{ px: 0 }}>
         {menuItems.map((item, index) => {
-          const isSelected = selected === item.text;
+          const isSelected = location.pathname.includes(item.pathId);
           return (
             <motion.div
               key={item.text}
@@ -92,7 +94,9 @@ function Sidebar({ role }) {
             >
               <ListItemButton
                 selected={isSelected}
-                onClick={() => setSelected(item.text)}
+                onClick={() => {
+                  navigate(`/${item.pathId}/${role}`);
+                }}
                 sx={{ position: "relative", overflow: "hidden" }}
               >
                 {isSelected && (
