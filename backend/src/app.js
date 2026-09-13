@@ -64,6 +64,15 @@ app.use('/api/auth/register', authLimiter);
 app.use(express.json({ limit: '20kb' }));
 app.use(express.urlencoded({ extended: true, limit: '20kb' }));
 
+// Backend root endpoint
+app.get('/', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: 'Hyperlocal Blood Donor Matching API is running',
+        version: '1.0.0',
+    });
+});
+
 // Base API root endpoint
 app.get('/api', (req, res) => {
     res.status(200).json({
