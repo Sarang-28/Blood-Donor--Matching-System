@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "build": "echo Backend ready",
     "init-db": "node database/initDb.js"
   },
   "keywords": [],
