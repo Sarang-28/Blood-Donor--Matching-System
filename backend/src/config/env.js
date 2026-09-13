@@ -13,7 +13,7 @@ module.exports = {
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD || 'postgres',
         database: process.env.DB_NAME || 'blood_donor_db',
-        ssl: process.env.DB_SSL === 'true' || (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('sslmode=require')) ? { rejectUnauthorized: false } : false,
+        ssl: process.env.DB_SSL === 'true' || (process.env.DATABASE_URL && (process.env.DATABASE_URL.includes('sslmode=require') || process.env.DATABASE_URL.includes('supabase') || process.env.DATABASE_URL.includes('pooler') || process.env.DATABASE_URL.includes('neon.tech') || process.env.DATABASE_URL.includes('render.com'))) ? { rejectUnauthorized: false } : false,
     },
 
     jwt: {

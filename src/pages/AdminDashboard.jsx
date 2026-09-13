@@ -649,7 +649,7 @@ function AdminDashboard() {
                     </Typography>
                   </Box>
                   <Typography variant="body2" color="text.secondary">
-                    Backend API: <code>http://localhost:5000/api</code>
+                    Backend API: <code>{api.defaults.baseURL || '/api'}</code>
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     Spatial Engine: PostgreSQL + PostGIS (v3.3)
