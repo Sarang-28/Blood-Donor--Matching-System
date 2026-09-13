@@ -222,6 +222,23 @@ function Login() {
                 maxWidth: 430,
               }}
             >
+              <Box sx={{ mb: 2 }}>
+                <Link
+                  to="/"
+                  style={{
+                    textDecoration: "none",
+                    color: "#E5384D",
+                    fontWeight: 600,
+                    fontSize: "0.88rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  ← Back to Home
+                </Link>
+              </Box>
+
               {/* Logo */}
               <Box
                 sx={{
@@ -247,6 +264,7 @@ function Login() {
                   color: "#171717",
                 }}
               >
+                Welcome Back
               </Typography>
 
               <Typography

@@ -2,6 +2,7 @@ import { Navigate, Routes, Route } from "react-router-dom";
 
 import Dashboard from "./pages/Dashboard";
 import Navbar from "./components/Navbar";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import RoleSelection from "./pages/RoleSelection";
@@ -20,8 +21,9 @@ const APP_ROLES = ["donor", "hospital", "patient", "blood_bank", "ngo"];
 function App() {
   return (
     <Routes>
-      {/* Public Authentication Routes */}
-      <Route path="/" element={<Login />} />
+      {/* Public Landing & Authentication Routes */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/roles" element={<RoleSelection />} />
       <Route path="/admin-login" element={<AdminLogin />} />
