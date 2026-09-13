@@ -71,6 +71,7 @@ function BloodRequests({ role }) {
       setSubmitting(true);
       const res = await api.post("/blood-requests", {
         ...formData,
+        role: role || "patient",
         unitsRequired: parseInt(formData.unitsRequired, 10),
       });
 
@@ -122,17 +123,15 @@ function BloodRequests({ role }) {
             Blood Requests
           </Typography>
 
-          {role !== "donor" && (
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<AddIcon />}
-              onClick={() => setDialogOpen(true)}
-              sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 700, px: 2.5 }}
-            >
-              Post Request
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<AddIcon />}
+            onClick={() => setDialogOpen(true)}
+            sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 700, px: 2.5 }}
+          >
+            Post Request
+          </Button>
         </Box>
 
         <Typography color="text.secondary" sx={{ mb: 4 }}>

@@ -19,6 +19,8 @@ import AssessmentIcon from "@mui/icons-material/Assessment";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 
+import { useAuth } from "../context/AuthContext";
+
 const drawerWidth = 280;
 
 const menuItems = [
@@ -34,10 +36,11 @@ const menuItems = [
 function AdminSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
-    // Basic logout logic for now (clears state in a real app)
-    navigate("/");
+    logout();
+    navigate("/admin-login");
   };
 
   return (

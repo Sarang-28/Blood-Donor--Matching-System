@@ -64,6 +64,26 @@ app.use('/api/auth/register', authLimiter);
 app.use(express.json({ limit: '20kb' }));
 app.use(express.urlencoded({ extended: true, limit: '20kb' }));
 
+// Base API root endpoint
+app.get('/api', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: 'Hyperlocal Blood Donor Matching API is operational',
+        version: '1.0.0',
+        documentation: {
+            health: '/api/health',
+            auth: '/api/auth',
+            donors: '/api/donors',
+            bloodRequests: '/api/blood-requests',
+            bloodBanks: '/api/blood-banks',
+            hospitals: '/api/hospitals',
+            matches: '/api/matches',
+            admin: '/api/admin',
+            notifications: '/api/notifications',
+        },
+    });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.status(200).json({

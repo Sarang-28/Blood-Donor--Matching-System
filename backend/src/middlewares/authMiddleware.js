@@ -37,6 +37,26 @@ const authenticateToken = async (req, res, next) => {
             return apiError(res, 'Account is suspended or deactivated. Contact administrator.', 403);
         }
 
+        // Detect all active role profiles associated with this user
+        const [donorCheck, patientCheck, hospitalCheck, bbCheck, ngoCheck] = await Promise.all([
+            db.query('SELECT 1 FROM donors WHERE user_id = $1 LIMIT 1', [user.id]),
+            db.query('SELECT 1 FROM patients WHERE user_id = $1 LIMIT 1', [user.id]),
+            db.query('SELECT 1 FROM hospitals WHERE user_id = $1 LIMIT 1', [user.id]),
+            db.query('SELECT 1 FROM blood_banks WHERE user_id = $1 LIMIT 1', [user.id]),
+            db.query('SELECT 1 FROM ngos WHERE user_id = $1 LIMIT 1', [user.id]),
+        ]);
+
+        const userRoles = [user.role];
+        if (donorCheck.rows.length > 0) userRoles.push('donor');
+        if (patientCheck.rows.length > 0) userRoles.push('patient');
+        if (hospitalCheck.rows.length > 0) userRoles.push('hospital');
+        if (bbCheck.rows.length > 0 || ngoCheck.rows.length > 0) {
+            userRoles.push('blood_bank');
+            userRoles.push('ngo');
+        }
+        if (user.role === 'admin') userRoles.push('admin');
+
+        user.roles = Array.from(new Set(userRoles));
         req.user = user;
         next();
     } catch (error) {

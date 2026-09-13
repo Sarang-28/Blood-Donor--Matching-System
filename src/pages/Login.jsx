@@ -20,18 +20,20 @@ import {
   AdminPanelSettings,
   ArrowForward,
 } from "@mui/icons-material";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(location.state?.registeredEmail || "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState(location.state?.successMessage || "");
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
@@ -49,7 +51,8 @@ function Login() {
       if (user.role === "admin") {
         navigate("/admin");
       } else {
-        navigate(`/dashboard/${user.role}`);
+        // Redirect to Role Selection page so user can choose to act as donor or patient
+        navigate("/roles");
       }
     } catch (err) {
       console.error("Login failed:", err);
@@ -255,6 +258,18 @@ function Login() {
               >
                 Sign in to continue to your account
               </Typography>
+
+              {successMsg && (
+                <Alert
+                  severity="success"
+                  sx={{
+                    mb: 3,
+                    borderRadius: 2,
+                  }}
+                >
+                  {successMsg}
+                </Alert>
+              )}
 
               {error && (
                 <Alert

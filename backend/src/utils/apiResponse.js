@@ -10,9 +10,11 @@ const apiSuccess = (res, data = null, message = 'Success', statusCode = 200) => 
 };
 
 const apiError = (res, error = 'Something went wrong', statusCode = 500, details = null) => {
+    const errorMessage = typeof error === 'string' ? error : (error.message || 'An error occurred');
     const payload = {
         success: false,
-        error: typeof error === 'string' ? error : (error.message || 'An error occurred'),
+        message: errorMessage,
+        error: errorMessage,
     };
     if (details) {
         payload.details = details;

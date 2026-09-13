@@ -6,8 +6,9 @@ const poolConfig = env.db.connectionString
         connectionString: env.db.connectionString,
         ssl: env.db.ssl,
         max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
+        idleTimeoutMillis: 60000,
+        connectionTimeoutMillis: 25000,
+        keepAlive: true,
       }
     : {
         host: env.db.host,
@@ -17,8 +18,9 @@ const poolConfig = env.db.connectionString
         database: env.db.database,
         ssl: env.db.ssl,
         max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
+        idleTimeoutMillis: 60000,
+        connectionTimeoutMillis: 25000,
+        keepAlive: true,
       };
 
 const pool = new Pool(poolConfig);

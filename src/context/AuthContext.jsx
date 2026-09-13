@@ -33,6 +33,15 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const [activeRole, setActiveRole] = useState(
+    localStorage.getItem('activeRole') || null
+  );
+
+  const selectRole = (newRole) => {
+    setActiveRole(newRole);
+    localStorage.setItem('activeRole', newRole);
+  };
+
   const login = async (credentials) => {
     const res = await api.post('/auth/login', credentials);
     const { token: receivedToken, user: receivedUser, profile: receivedProfile } = res.data.data;
@@ -42,6 +51,9 @@ export function AuthProvider({ children }) {
     if (receivedProfile) {
       localStorage.setItem('profile', JSON.stringify(receivedProfile));
     }
+    const initialRole = receivedUser.role || 'donor';
+    localStorage.setItem('activeRole', initialRole);
+    setActiveRole(initialRole);
 
     setToken(receivedToken);
     setUser(receivedUser);
@@ -56,6 +68,8 @@ export function AuthProvider({ children }) {
 
     localStorage.setItem('token', receivedToken);
     localStorage.setItem('user', JSON.stringify(receivedUser));
+    localStorage.setItem('activeRole', 'admin');
+    setActiveRole('admin');
 
     setToken(receivedToken);
     setUser(receivedUser);
@@ -64,29 +78,55 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (userData) => {
+    // Post registration details
     const res = await api.post('/auth/register', userData);
-    const { token: receivedToken, user: receivedUser, profile: receivedProfile } = res.data.data;
-
-    localStorage.setItem('token', receivedToken);
-    localStorage.setItem('user', JSON.stringify(receivedUser));
-    if (receivedProfile) {
-      localStorage.setItem('profile', JSON.stringify(receivedProfile));
+    if (user && res.data?.data?.user) {
+      const updatedUser = { ...user, ...res.data.data.user };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      if (res.data.data.token) {
+        localStorage.setItem('token', res.data.data.token);
+        setToken(res.data.data.token);
+      }
     }
-
-    setToken(receivedToken);
-    setUser(receivedUser);
-    setProfile(receivedProfile || null);
-
-    return { user: receivedUser, profile: receivedProfile };
+    return res.data;
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('profile');
+    localStorage.removeItem('activeRole');
     setToken(null);
     setUser(null);
     setProfile(null);
+    setActiveRole(null);
+  };
+
+  const updateProfile = (newProfile) => {
+    setProfile(newProfile);
+    if (newProfile) {
+      localStorage.setItem('profile', JSON.stringify(newProfile));
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      const res = await api.get('/auth/me');
+      if (res.data?.data) {
+        const { user: fetchedUser, profile: fetchedProfile } = res.data.data;
+        if (fetchedUser) {
+          setUser(fetchedUser);
+          localStorage.setItem('user', JSON.stringify(fetchedUser));
+        }
+        if (fetchedProfile) {
+          setProfile(fetchedProfile);
+          localStorage.setItem('profile', JSON.stringify(fetchedProfile));
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to refresh user profile:', e);
+    }
   };
 
   const value = {
@@ -94,6 +134,8 @@ export function AuthProvider({ children }) {
     profile,
     token,
     loading,
+    activeRole,
+    selectRole,
     isAuthenticated: Boolean(token && user),
     login,
     adminLogin,
@@ -101,6 +143,8 @@ export function AuthProvider({ children }) {
     logout,
     setUser,
     setProfile,
+    updateProfile,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

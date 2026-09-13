@@ -3,6 +3,7 @@ import {
   Avatar,
   Badge,
   Box,
+  Button,
   IconButton,
   InputBase,
   Toolbar,
@@ -14,6 +15,7 @@ import { motion } from "framer-motion";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import SearchIcon from "@mui/icons-material/Search";
 import LogoutIcon from "@mui/icons-material/Logout";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import NotificationMenu from "./NotificationMenu";
@@ -92,7 +94,34 @@ function Navbar() {
         </Box>
 
         {/* Right Side */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2.5 }}>
+          {/* Switch Role Button */}
+          <Tooltip title="Switch between Donor, Patient, etc.">
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<SwapHorizIcon />}
+              onClick={() => navigate("/roles")}
+              sx={{
+                borderRadius: 2.5,
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.82rem",
+                color: "text.primary",
+                borderColor: "rgba(0,0,0,0.18)",
+                display: { xs: "none", sm: "inline-flex" },
+                px: 1.5,
+                "&:hover": {
+                  borderColor: "primary.main",
+                  color: "primary.main",
+                  bgcolor: "rgba(229, 56, 77, 0.05)",
+                },
+              }}
+            >
+              Switch Role
+            </Button>
+          </Tooltip>
+
           {/* Notification Bell Menu */}
           <NotificationMenu />
 

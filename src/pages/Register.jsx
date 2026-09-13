@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Alert,
   Box,
@@ -11,9 +11,11 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   CircularProgress,
+  Button,
 } from "@mui/material";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
@@ -48,28 +50,32 @@ const ROLES = [
 
 function Register() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const location = useLocation();
+  const { user, profile, register, selectRole } = useAuth();
 
-  const [role, setRole] = useState("");
+  const queryParams = new URLSearchParams(location.search);
+  const initialRoleParam = queryParams.get("role") || location.state?.role || "";
+
+  const [role, setRole] = useState(initialRoleParam);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
-    fullName: "",
+    fullName: profile?.full_name || "",
     organizationName: "",
-    email: "",
+    email: user?.email || "",
     password: "",
-    phone: "",
-    bloodGroup: "O+",
+    phone: user?.phone || "",
+    bloodGroup: profile?.blood_group || "O+",
     lastDonationDate: "",
-    location: "Pune, Maharashtra",
+    location: profile?.location_name || profile?.address || "Pune, Maharashtra",
     // Hospital
     hospitalAddress: "",
     hospitalRegistrationNumber: "",
     emergencyContact: "",
     // Patient
-    patientAddress: "",
+    patientAddress: profile?.location_name || profile?.address || "Pune, Maharashtra",
     medicalCondition: "",
     // Blood Bank
     bloodBankAddress: "",
@@ -77,6 +83,24 @@ function Register() {
     directorName: "",
     operatingHours: "24/7",
   });
+
+  useEffect(() => {
+    if (initialRoleParam) {
+      setRole(initialRoleParam);
+    }
+  }, [initialRoleParam]);
+
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        email: prev.email || user.email || "",
+        phone: prev.phone || user.phone || "",
+        fullName: prev.fullName || profile?.full_name || "",
+        bloodGroup: prev.bloodGroup || profile?.blood_group || "O+",
+      }));
+    }
+  }, [user, profile]);
 
   const handleChange = (field) => (e) => {
     setFormData({ ...formData, [field]: e.target.value });
@@ -90,7 +114,7 @@ function Register() {
       return;
     }
 
-    if (!formData.email || !formData.password || !formData.phone) {
+    if (!formData.email || (!user && !formData.password) || !formData.phone) {
       setError("Please fill in all mandatory account credentials.");
       return;
     }
@@ -104,12 +128,31 @@ function Register() {
         role,
       };
 
-      const result = await register(payload);
-      const userRole = result.user.role;
-      navigate(`/dashboard/${userRole}`);
+      await register(payload);
+
+      if (user) {
+        if (selectRole) {
+          selectRole(role);
+        }
+        navigate("/roles", {
+          state: {
+            successMessage: `Successfully added ${role.replace("_", " ").toUpperCase()} profile to your account! You can now switch between roles anytime.`,
+          },
+        });
+      } else {
+        navigate("/", {
+          state: {
+            successMessage: "Registration successful! Please sign in with your email and password.",
+            registeredEmail: formData.email,
+          },
+        });
+      }
     } catch (err) {
       console.error("Registration failed:", err);
-      const msg = err.response?.data?.message || err.message;
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message;
       setError(msg || "Registration failed. Please review your details and try again.");
     } finally {
       setLoading(false);
@@ -165,6 +208,35 @@ function Register() {
               Join the Emergency Blood Donor Network
             </Typography>
 
+            {user && (
+              <Alert
+                severity="info"
+                sx={{
+                  mb: 3,
+                  borderRadius: 2,
+                  "& .MuiAlert-message": { width: "100%" },
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Adding Role Profile to Your Account
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                  Signed in as <strong>{user.email}</strong>. Setting up a new role profile here will link it to your existing account so you can easily switch between roles.
+                </Typography>
+                <Box sx={{ mt: 1 }}>
+                  <Button
+                    size="small"
+                    variant="text"
+                    startIcon={<ArrowBackIcon />}
+                    onClick={() => navigate("/roles")}
+                    sx={{ textTransform: "none", p: 0, fontWeight: 600 }}
+                  >
+                    Back to Role Selection
+                  </Button>
+                </Box>
+              </Alert>
+            )}
+
             {error && (
               <Alert
                 severity="error"
@@ -188,7 +260,7 @@ function Register() {
                 color: "text.secondary",
               }}
             >
-              I am registering as a...
+              {user ? "Select the role profile you want to add:" : "I am registering as a..."}
             </Typography>
 
             <ToggleButtonGroup
@@ -279,16 +351,23 @@ function Register() {
                   type="email"
                   margin="normal"
                   required
+                  disabled={Boolean(user)}
                   value={formData.email}
                   onChange={handleChange("email")}
+                  helperText={user ? "Linked to your current account" : ""}
                 />
 
                 <TextField
                   fullWidth
                   type="password"
-                  label="Password"
+                  label={user ? "Account Password (Optional)" : "Password"}
+                  helperText={
+                    user
+                      ? "Optional: You are logged in, so your existing password is automatically preserved."
+                      : "Minimum 6 characters"
+                  }
                   margin="normal"
-                  required
+                  required={!user}
                   value={formData.password}
                   onChange={handleChange("password")}
                 />
@@ -355,12 +434,39 @@ function Register() {
                   <>
                     <TextField
                       fullWidth
+                      select
+                      label="Blood Group Needed / Patient Blood Group"
+                      margin="normal"
+                      value={formData.bloodGroup}
+                      onChange={handleChange("bloodGroup")}
+                      required
+                    >
+                      {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
+                        (group) => (
+                          <MenuItem key={group} value={group}>
+                            {group}
+                          </MenuItem>
+                        )
+                      )}
+                    </TextField>
+
+                    <TextField
+                      fullWidth
                       label="Residential Address / Location"
                       placeholder="e.g. Pune, Maharashtra"
                       margin="normal"
                       required
                       value={formData.patientAddress}
                       onChange={handleChange("patientAddress")}
+                    />
+
+                    <TextField
+                      fullWidth
+                      label="Medical Condition / Reason for Blood Need"
+                      placeholder="e.g. Surgery, Dengue, Emergency Care"
+                      margin="normal"
+                      value={formData.medicalCondition}
+                      onChange={handleChange("medicalCondition")}
                     />
 
                     <TextField

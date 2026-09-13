@@ -30,6 +30,7 @@ router.get('/users', adminController.getUsers);
  * @access  Private (Admin only)
  */
 router.patch('/users/:id/status', adminController.updateUserStatus);
+router.post('/users/:id/status', adminController.updateUserStatus);
 
 /**
  * @route   PATCH /api/admin/verifications/:type/:id
@@ -37,6 +38,7 @@ router.patch('/users/:id/status', adminController.updateUserStatus);
  * @access  Private (Admin only)
  */
 router.patch('/verifications/:type/:id', adminController.verifyInstitution);
+router.post('/verifications/:type/:id', adminController.verifyInstitution);
 
 /**
  * @route   GET /api/admin/requests/critical

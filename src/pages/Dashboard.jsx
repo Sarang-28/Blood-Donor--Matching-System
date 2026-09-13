@@ -20,15 +20,20 @@ import {
 } from "@mui/material";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import HistoryIcon from "@mui/icons-material/History";
+import AddIcon from "@mui/icons-material/Add";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 import DonorDashboard from "./DonorDashboard";
 import HospitalDashboard from "./HospitalDashboard";
 import BloodBankDashboard from "./BloodBankDashboard";
+import Sidebar from "../components/Sidebar";
 
 const MotionCard = motion.create(Card);
 
 function Dashboard({ role }) {
+    const navigate = useNavigate();
+
     if (role === "donor") {
         return <DonorDashboard />;
     }
@@ -110,15 +115,29 @@ function Dashboard({ role }) {
                     mt: 8,
                 }}
             >
-                <Typography
-                    component={motion.h4}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    variant="h4"
-                    sx={{ fontWeight: "bold", mb: 4 }}
-                >
-                    {currentRole.title}
-                </Typography>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
+                    <Typography
+                        component={motion.h4}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        variant="h4"
+                        sx={{ fontWeight: "bold" }}
+                    >
+                        {currentRole.title}
+                    </Typography>
+
+                    {role === "patient" && (
+                        <Button
+                            variant="contained"
+                            color="error"
+                            startIcon={<AddIcon />}
+                            onClick={() => navigate(`/blood-requests/${role}`)}
+                            sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 700, px: 2.5 }}
+                        >
+                            Request Blood Now
+                        </Button>
+                    )}
+                </Box>
 
                 <Grid container spacing={3}>
                     {stats.map((item, index) => (

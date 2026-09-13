@@ -19,6 +19,7 @@ import BloodtypeIcon from "@mui/icons-material/Bloodtype";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import PersonIcon from "@mui/icons-material/Person";
 import LogoutIcon from "@mui/icons-material/Logout";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -35,7 +36,6 @@ function Sidebar({ role }) {
     ...(role === "donor"
       ? [
         { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },
-        { text: "Hospitals", pathId: "hospitals", icon: <LocalHospitalIcon /> },
       ]
       : []),
 
@@ -50,7 +50,6 @@ function Sidebar({ role }) {
       ? [
         { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },
         { text: "Donors", pathId: "donors", icon: <FavoriteIcon /> },
-        { text: "Hospitals", pathId: "hospitals", icon: <LocalHospitalIcon /> },
       ]
       : []),
 
@@ -59,7 +58,6 @@ function Sidebar({ role }) {
         { text: "Inventory", pathId: "inventory", icon: <BloodtypeIcon /> },
         { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },
         { text: "Donors", pathId: "donors", icon: <FavoriteIcon /> },
-        { text: "Hospitals", pathId: "hospitals", icon: <LocalHospitalIcon /> },
       ]
       : []),
 
@@ -164,6 +162,17 @@ function Sidebar({ role }) {
             </Typography>
           </Box>
         )}
+        <Button
+          fullWidth
+          variant="outlined"
+          color="primary"
+          size="small"
+          startIcon={<SwapHorizIcon />}
+          onClick={() => navigate("/roles")}
+          sx={{ mb: 1, borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+        >
+          Switch Role
+        </Button>
         <Button
           fullWidth
           variant="outlined"

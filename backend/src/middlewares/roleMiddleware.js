@@ -10,7 +10,10 @@ const authorizeRoles = (...allowedRoles) => {
             return apiError(res, 'User not authenticated', 401);
         }
 
-        if (!allowedRoles.includes(req.user.role)) {
+        const userRoles = req.user.roles || [req.user.role];
+        const isAuthorized = allowedRoles.some(r => userRoles.includes(r));
+
+        if (!isAuthorized) {
             return apiError(
                 res,
                 `Access forbidden: requires one of the following roles: [${allowedRoles.join(', ')}]`,

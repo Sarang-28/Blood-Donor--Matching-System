@@ -21,10 +21,16 @@ const createRequest = async (req, res, next) => {
             longitude,
             contactPhone,
             notes,
+            role,
         } = req.body;
 
         const resolvedLocation = locationName || location || 'Pune, Maharashtra';
         const coords = resolveCoordinates(latitude, longitude);
+
+        const allowedRequesterRoles = ['hospital', 'patient', 'blood_bank', 'donor'];
+        const effectiveRequesterRole = role && allowedRequesterRoles.includes(role)
+            ? role
+            : (allowedRequesterRoles.includes(req.user.role) ? req.user.role : 'patient');
 
         const insertSql = `
             INSERT INTO blood_requests (
@@ -51,7 +57,7 @@ const createRequest = async (req, res, next) => {
 
         const values = [
             req.user.id,
-            req.user.role,
+            effectiveRequesterRole,
             patientName || 'Emergency Patient',
             hospitalName || 'Local Medical Center',
             bloodGroup,

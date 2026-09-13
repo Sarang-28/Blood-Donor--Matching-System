@@ -17,6 +17,7 @@ router.post(
     [
         body('email').isEmail().withMessage('Please provide a valid email address'),
         body('password')
+            .optional({ checkFalsy: true })
             .isLength({ min: 6 })
             .withMessage('Password must be at least 6 characters long'),
         body('role')
@@ -48,7 +49,7 @@ router.post(
  * @access  Public
  */
 router.post(
-    '/admin-login',
+    ['/admin-login', '/admin/login'],
     [
         body('password').notEmpty().withMessage('Password is required'),
         validate,

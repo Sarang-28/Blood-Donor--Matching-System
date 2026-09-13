@@ -7,18 +7,70 @@ const { resolveCoordinates } = require('../utils/geoUtils');
 const { apiSuccess, apiError } = require('../utils/apiResponse');
 
 /**
- * Generate JWT token
+ * Generate JWT token with all authorized user roles
  */
-const generateToken = (user) => {
+const generateToken = (user, availableRoles = []) => {
+    const roles = Array.from(new Set([user.role, ...(availableRoles || [])]));
     return jwt.sign(
         {
             userId: user.id,
             email: user.email,
             role: user.role,
+            roles,
         },
         env.jwt.secret,
         { expiresIn: env.jwt.expiresIn }
     );
+};
+
+/**
+ * Fetch all registered profiles and active roles for a user
+ */
+const getUserProfilesAndRoles = async (userId, primaryRole) => {
+    const [donorRes, patientRes, hospitalRes, bbRes, ngoRes] = await Promise.all([
+        db.query('SELECT * FROM donors WHERE user_id = $1', [userId]),
+        db.query('SELECT * FROM patients WHERE user_id = $1', [userId]),
+        db.query('SELECT * FROM hospitals WHERE user_id = $1', [userId]),
+        db.query('SELECT * FROM blood_banks WHERE user_id = $1', [userId]),
+        db.query('SELECT * FROM ngos WHERE user_id = $1', [userId]),
+    ]);
+
+    const availableRoles = [];
+    const profiles = {};
+
+    if (donorRes.rows.length > 0) {
+        availableRoles.push('donor');
+        profiles.donor = donorRes.rows[0];
+    }
+    if (patientRes.rows.length > 0) {
+        availableRoles.push('patient');
+        profiles.patient = patientRes.rows[0];
+    }
+    if (hospitalRes.rows.length > 0) {
+        availableRoles.push('hospital');
+        profiles.hospital = hospitalRes.rows[0];
+    }
+    if (bbRes.rows.length > 0) {
+        availableRoles.push('blood_bank');
+        profiles.blood_bank = bbRes.rows[0];
+    }
+    if (ngoRes.rows.length > 0) {
+        availableRoles.push('blood_bank');
+        availableRoles.push('ngo');
+        profiles.ngo = ngoRes.rows[0];
+        if (!profiles.blood_bank) profiles.blood_bank = ngoRes.rows[0];
+    }
+    if (primaryRole === 'admin') {
+        availableRoles.push('admin');
+    }
+    if (availableRoles.length === 0 && primaryRole) {
+        availableRoles.push(primaryRole);
+    }
+
+    return {
+        availableRoles: Array.from(new Set(availableRoles)),
+        profiles,
+    };
 };
 
 /**
@@ -67,33 +119,95 @@ const register = async (req, res, next) => {
 
         const effectiveRole = (role === 'ngo' || role === ROLES.NGO) ? ROLES.BLOOD_BANK : role;
 
-        // Check if user already exists
-        const existingCheck = await client.query(
-            'SELECT id FROM users WHERE email = $1',
-            [email.toLowerCase().trim()]
-        );
-        if (existingCheck.rows.length > 0) {
-            return apiError(res, 'An account with this email already exists.', 409);
+        // Check if caller is authenticated with a valid token
+        let tokenUserId = null;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            try {
+                const bearerToken = authHeader.split(' ')[1];
+                const decoded = jwt.verify(bearerToken, env.jwt.secret);
+                tokenUserId = decoded.userId;
+            } catch (err) {
+                // Token invalid or expired, continue as guest
+            }
         }
 
-        // Hash password securely with bcrypt (10 rounds)
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
+        // Check if user already exists
+        const existingCheck = await client.query(
+            'SELECT * FROM users WHERE email = $1',
+            [email.toLowerCase().trim()]
+        );
+
+        let targetUser = null;
+        let isExistingUser = false;
+
+        if (existingCheck.rows.length > 0) {
+            const existingUser = existingCheck.rows[0];
+            const isSelfAuthenticated = Boolean(tokenUserId && tokenUserId === existingUser.id);
+            let isPasswordMatch = false;
+
+            if (password) {
+                isPasswordMatch = await bcrypt.compare(password, existingUser.password_hash);
+            }
+
+            // If not logged in as this user and password didn't match
+            if (!isSelfAuthenticated && !isPasswordMatch) {
+                return apiError(
+                    res,
+                    'An account with this email already exists. Please enter your existing account password to add this role, or sign in first.',
+                    409
+                );
+            }
+
+            // Check if user already has a profile for this role
+            let tableToCheck = null;
+            if (effectiveRole === ROLES.DONOR) tableToCheck = 'donors';
+            else if (effectiveRole === ROLES.PATIENT) tableToCheck = 'patients';
+            else if (effectiveRole === ROLES.HOSPITAL) tableToCheck = 'hospitals';
+            else if (effectiveRole === ROLES.BLOOD_BANK || effectiveRole === 'ngo') tableToCheck = 'ngos';
+
+            if (tableToCheck) {
+                const roleExists = await client.query(
+                    `SELECT id FROM ${tableToCheck} WHERE user_id = $1`,
+                    [existingUser.id]
+                );
+                if (roleExists.rows.length > 0) {
+                    return apiError(
+                        res,
+                        `You already have an active profile for ${effectiveRole.replace('_', ' ').toUpperCase()}. You can switch to this role directly from the Role Selection page.`,
+                        400
+                    );
+                }
+            }
+
+            targetUser = existingUser;
+            isExistingUser = true;
+        } else {
+            if (!password) {
+                return apiError(res, 'Password is required to create a new account.', 400);
+            }
+
+            // Hash password securely with bcrypt (10 rounds)
+            const salt = await bcrypt.genSalt(10);
+            const passwordHash = await bcrypt.hash(password, salt);
+
+            const dbRole = (effectiveRole === 'blood_bank' || effectiveRole === ROLES.BLOOD_BANK) ? 'ngo' : effectiveRole;
+
+            // Insert into users table
+            const userInsert = await client.query(
+                `INSERT INTO users (email, password_hash, role, phone)
+                 VALUES ($1, $2, $3, $4)
+                 RETURNING id, email, role, phone, is_active, created_at;`,
+                [email.toLowerCase().trim(), passwordHash, dbRole, phone]
+            );
+            targetUser = userInsert.rows[0];
+        }
 
         // Resolve coordinates with fallback
         const coords = resolveCoordinates(latitude, longitude);
         const locationName = location || hospitalAddress || ngoAddress || patientAddress || 'Pune, Maharashtra';
 
         await client.query('BEGIN');
-
-        // 1. Insert into users table
-        const userInsert = await client.query(
-            `INSERT INTO users (email, password_hash, role, phone)
-             VALUES ($1, $2, $3, $4)
-             RETURNING id, email, role, phone, is_active, created_at;`,
-            [email.toLowerCase().trim(), passwordHash, effectiveRole, phone]
-        );
-        const newUser = userInsert.rows[0];
 
         let profileData = {};
 
@@ -112,7 +226,7 @@ const register = async (req, res, next) => {
                 )
                 RETURNING id, full_name, blood_group, age, weight_kg, location_name, availability_status, last_donation_date;`,
                 [
-                    newUser.id,
+                    targetUser.id,
                     donorName,
                     bloodGroup || 'O+',
                     age ? parseInt(age, 10) : 25,
@@ -139,7 +253,7 @@ const register = async (req, res, next) => {
                 )
                 RETURNING id, hospital_name, license_number, address, emergency_contact, speciality, verification_status;`,
                 [
-                    newUser.id,
+                    targetUser.id,
                     name,
                     licenseNo,
                     address,
@@ -164,7 +278,7 @@ const register = async (req, res, next) => {
                 )
                 RETURNING id, full_name, blood_group, medical_condition, attending_doctor, address, emergency_contact;`,
                 [
-                    newUser.id,
+                    targetUser.id,
                     name,
                     bloodGroup || 'O+',
                     medicalCondition || 'Under evaluation',
@@ -176,67 +290,63 @@ const register = async (req, res, next) => {
                 ]
             );
             profileData = patientInsert.rows[0];
-        } else if (effectiveRole === ROLES.BLOOD_BANK) {
+        } else if (effectiveRole === ROLES.BLOOD_BANK || effectiveRole === 'ngo') {
             const name = bloodBankName || organizationName || fullName || 'Regional Blood Bank';
             const licenseNo = licenseNumber || ngoRegistrationNumber || `BB-${Date.now()}`;
-            const director = directorName || coordinatorName || 'Chief Medical Officer';
-            const contact = contactNumber || phone;
-            const hours = operatingHours || '24/7';
+            const director = directorName || coordinatorName || 'Director';
+            const contact = req.body.contactNumber || emergencyContact || phone;
             const address = bloodBankAddress || ngoAddress || locationName;
+            const areas = areasOfOperation || 'Pune District';
 
-            const bbInsert = await client.query(
-                `INSERT INTO blood_banks (
-                    user_id, blood_bank_name, license_number, director_name, contact_number,
-                    operating_hours, address, geom
+            const ngoInsert = await client.query(
+                `INSERT INTO ngos (
+                    user_id, ngo_name, registration_number, coordinator_name, contact_number,
+                    areas_of_operation, address, geom
                 )
                 VALUES (
                     $1, $2, $3, $4, $5, $6, $7,
                     ST_SetSRID(ST_MakePoint($8, $9), 4326)
                 )
-                RETURNING id, blood_bank_name, license_number, director_name, contact_number, operating_hours, address, verification_status;`,
+                RETURNING id, ngo_name, registration_number, coordinator_name, contact_number, areas_of_operation, address, verification_status;`,
                 [
-                    newUser.id,
+                    targetUser.id,
                     name,
                     licenseNo,
                     director,
                     contact,
-                    hours,
+                    areas,
                     address,
                     coords.longitude,
                     coords.latitude,
                 ]
             );
-            profileData = bbInsert.rows[0];
-
-            // Initialize 0 units for all 8 standard blood groups
-            const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-            for (const bg of bloodGroups) {
-                await client.query(
-                    `INSERT INTO blood_inventory (blood_bank_id, blood_group, units_available)
-                     VALUES ($1, $2, 0)
-                     ON CONFLICT DO NOTHING;`,
-                    [profileData.id, bg]
-                );
-            }
+            profileData = ngoInsert.rows[0];
         }
 
         await client.query('COMMIT');
 
-        const token = generateToken(newUser);
+        const { availableRoles, profiles } = await getUserProfilesAndRoles(targetUser.id, targetUser.role);
+        const token = generateToken(targetUser, availableRoles);
+
+        const successMessage = isExistingUser
+            ? `Successfully added ${effectiveRole.replace('_', ' ').toUpperCase()} role to your account! You can now log in and switch between roles.`
+            : 'Registration successful! Welcome to the Blood Donor Matching Network.';
 
         return apiSuccess(
             res,
             {
                 token,
                 user: {
-                    id: newUser.id,
-                    email: newUser.email,
-                    role: newUser.role,
-                    phone: newUser.phone,
+                    id: targetUser.id,
+                    email: targetUser.email,
+                    role: targetUser.role,
+                    availableRoles,
+                    phone: targetUser.phone,
                 },
                 profile: profileData,
+                profiles,
             },
-            'Registration successful! Welcome to the Blood Donor Matching Network.',
+            successMessage,
             201
         );
     } catch (error) {
@@ -280,23 +390,14 @@ const login = async (req, res, next) => {
             return apiError(res, 'Invalid credentials. Please verify your email and password.', 401);
         }
 
-        // Fetch associated profile
-        let profile = null;
-        if (user.role === ROLES.DONOR) {
-            const p = await db.query('SELECT * FROM donors WHERE user_id = $1', [user.id]);
-            profile = p.rows[0] || null;
-        } else if (user.role === ROLES.HOSPITAL) {
-            const p = await db.query('SELECT * FROM hospitals WHERE user_id = $1', [user.id]);
-            profile = p.rows[0] || null;
-        } else if (user.role === ROLES.PATIENT) {
-            const p = await db.query('SELECT * FROM patients WHERE user_id = $1', [user.id]);
-            profile = p.rows[0] || null;
-        } else if (user.role === ROLES.BLOOD_BANK || user.role === 'blood_bank' || user.role === 'ngo') {
-            const p = await db.query('SELECT * FROM blood_banks WHERE user_id = $1', [user.id]);
-            profile = p.rows[0] || null;
-        }
+        // Fetch associated profiles and all available roles
+        const { availableRoles, profiles } = await getUserProfilesAndRoles(user.id, user.role);
+        const token = generateToken(user, availableRoles);
 
-        const token = generateToken(user);
+        let profile = profiles[user.role] || null;
+        if (!profile && availableRoles.length > 0) {
+            profile = profiles[availableRoles[0]] || null;
+        }
 
         return apiSuccess(
             res,
@@ -306,9 +407,11 @@ const login = async (req, res, next) => {
                     id: user.id,
                     email: user.email,
                     role: user.role,
+                    availableRoles,
                     phone: user.phone,
                 },
                 profile,
+                profiles,
             },
             'Login successful.'
         );
@@ -351,7 +454,8 @@ const adminLogin = async (req, res, next) => {
             return apiError(res, 'Unauthorized: Invalid Admin credentials.', 401);
         }
 
-        const token = generateToken(user);
+        const { availableRoles, profiles } = await getUserProfilesAndRoles(user.id, user.role);
+        const token = generateToken(user, availableRoles);
 
         return apiSuccess(
             res,
@@ -361,8 +465,11 @@ const adminLogin = async (req, res, next) => {
                     id: user.id,
                     email: user.email,
                     role: user.role,
+                    availableRoles,
                     name: 'Super Admin',
                 },
+                profile: null,
+                profiles,
             },
             'Admin authentication successful.'
         );
@@ -377,46 +484,19 @@ const adminLogin = async (req, res, next) => {
 const getMe = async (req, res, next) => {
     try {
         const user = req.user;
-        let profile = null;
-
-        if (user.role === ROLES.DONOR) {
-            const p = await db.query(`
-                SELECT id, full_name, blood_group, age, weight_kg, location_name,
-                       availability_status, last_donation_date, emergency_ready, total_donations
-                FROM donors WHERE user_id = $1;
-            `, [user.id]);
-            profile = p.rows[0] || null;
-        } else if (user.role === ROLES.HOSPITAL) {
-            const p = await db.query(`
-                SELECT id, hospital_name, license_number, address, emergency_contact,
-                       speciality, verification_status, verified_at
-                FROM hospitals WHERE user_id = $1;
-            `, [user.id]);
-            profile = p.rows[0] || null;
-        } else if (user.role === ROLES.PATIENT) {
-            const p = await db.query(`
-                SELECT id, full_name, blood_group, medical_condition, attending_doctor,
-                       address, emergency_contact
-                FROM patients WHERE user_id = $1;
-            `, [user.id]);
-            profile = p.rows[0] || null;
-        } else if (user.role === ROLES.NGO) {
-            const p = await db.query(`
-                SELECT id, ngo_name, registration_number, coordinator_name, contact_number,
-                       areas_of_operation, address, verification_status
-                FROM ngos WHERE user_id = $1;
-            `, [user.id]);
-            profile = p.rows[0] || null;
-        }
+        const { availableRoles, profiles } = await getUserProfilesAndRoles(user.id, user.role);
+        const profile = profiles[user.role] || (availableRoles.length > 0 ? profiles[availableRoles[0]] : null);
 
         return apiSuccess(res, {
             user: {
                 id: user.id,
                 email: user.email,
                 role: user.role,
+                availableRoles,
                 phone: user.phone,
             },
             profile,
+            profiles,
         });
     } catch (error) {
         next(error);
@@ -436,4 +516,5 @@ module.exports = {
     adminLogin,
     getMe,
     logout,
+    getUserProfilesAndRoles,
 };

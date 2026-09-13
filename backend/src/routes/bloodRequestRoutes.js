@@ -13,12 +13,12 @@ const router = express.Router();
 /**
  * @route   POST /api/blood-requests
  * @desc    Create new blood request and trigger hyperlocal PostGIS matching
- * @access  Private (Hospital, Patient, NGO)
+ * @access  Private (Hospital, Patient, Blood Bank, NGO, Donor)
  */
 router.post(
     '/',
     authenticateToken,
-    authorizeRoles(ROLES.HOSPITAL, ROLES.PATIENT, ROLES.BLOOD_BANK, ROLES.NGO, ROLES.ADMIN),
+    authorizeRoles(ROLES.HOSPITAL, ROLES.PATIENT, ROLES.BLOOD_BANK, ROLES.NGO, ROLES.ADMIN, ROLES.DONOR),
     [
         body('bloodGroup')
             .isIn(ALL_BLOOD_GROUPS)
@@ -64,7 +64,7 @@ router.get('/:id', authenticateToken, bloodRequestController.getRequestById);
 router.patch(
     '/:id/status',
     authenticateToken,
-    authorizeRoles(ROLES.HOSPITAL, ROLES.PATIENT, ROLES.BLOOD_BANK, ROLES.NGO, ROLES.ADMIN),
+    authorizeRoles(ROLES.HOSPITAL, ROLES.PATIENT, ROLES.BLOOD_BANK, ROLES.NGO, ROLES.ADMIN, ROLES.DONOR),
     [
         body('status').notEmpty().withMessage('Status is required'),
         validate,

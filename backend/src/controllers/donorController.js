@@ -65,6 +65,19 @@ const updateProfile = async (req, res, next) => {
         }
         const existing = current.rows[0];
 
+        if (age !== undefined && age !== null && age !== '') {
+            const parsedAge = parseInt(age, 10);
+            if (isNaN(parsedAge) || parsedAge < 18 || parsedAge > 65) {
+                return apiError(res, 'Donor age must be between 18 and 65 years.', 400);
+            }
+        }
+        if (weightKg !== undefined && weightKg !== null && weightKg !== '') {
+            const parsedWeight = parseFloat(weightKg);
+            if (isNaN(parsedWeight) || parsedWeight < 45.0) {
+                return apiError(res, 'Donor weight must be at least 45.0 kg for donation eligibility.', 400);
+            }
+        }
+
         const coords = (latitude && longitude)
             ? resolveCoordinates(latitude, longitude)
             : null;
