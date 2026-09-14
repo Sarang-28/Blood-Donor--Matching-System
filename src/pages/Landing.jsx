@@ -901,7 +901,7 @@ function Landing() {
                         Can Donate Blood To
                       </Typography>
                     </Box>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                       {activeCompat.give.map((t) => (
                         <Chip
                           key={t}
@@ -914,7 +914,7 @@ function Landing() {
                           }}
                         />
                       ))}
-                    </Stack>
+                    </Box>
                   </Box>
                 </Grid>
 
@@ -937,7 +937,7 @@ function Landing() {
                         Can Receive Blood From
                       </Typography>
                     </Box>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                       {activeCompat.receive.map((t) => (
                         <Chip
                           key={t}
@@ -950,7 +950,7 @@ function Landing() {
                           }}
                         />
                       ))}
-                    </Stack>
+                    </Box>
                   </Box>
                 </Grid>
               </Grid>

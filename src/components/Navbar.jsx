@@ -16,8 +16,11 @@ import NotificationsIcon from "@mui/icons-material/Notifications";
 import SearchIcon from "@mui/icons-material/Search";
 import LogoutIcon from "@mui/icons-material/Logout";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useThemeContext } from "../context/ThemeContext";
 import NotificationMenu from "./NotificationMenu";
 
 const drawerWidth = 240;
@@ -26,6 +29,7 @@ function Navbar() {
   const { role } = useParams();
   const navigate = useNavigate();
   const { user, profile, logout } = useAuth();
+  const { mode, toggleTheme } = useThemeContext();
   const effectiveRole = role || user?.role || "";
   const formattedRole = effectiveRole ? effectiveRole.replace("_", " ").toUpperCase() : "";
   const displayName = profile?.full_name || profile?.hospital_name || profile?.blood_bank_name || user?.email?.split('@')[0] || "User";
@@ -38,7 +42,7 @@ function Navbar() {
       sx={{
         width: `calc(100% - ${drawerWidth}px)`,
         ml: `${drawerWidth}px`,
-        color: "#222",
+        color: "text.primary",
         borderBottom: "1px solid rgba(0,0,0,0.06)",
       }}
     >
@@ -82,7 +86,7 @@ function Navbar() {
             transition: "border-color 0.25s ease, background-color 0.25s ease",
             "&:focus-within": {
               borderColor: "primary.main",
-              bgcolor: "#fff",
+              bgcolor: "background.paper",
             },
           }}
         >
@@ -120,6 +124,13 @@ function Navbar() {
             >
               Switch Role
             </Button>
+          </Tooltip>
+
+          {/* Theme Toggle Button */}
+          <Tooltip title={mode === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}>
+            <IconButton onClick={toggleTheme} color="inherit" sx={{ color: 'text.primary' }}>
+              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
           </Tooltip>
 
           {/* Notification Bell Menu */}
