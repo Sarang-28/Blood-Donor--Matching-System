@@ -1,5 +1,6 @@
-import { Navigate, Routes, Route } from "react-router-dom";
-
+import { useEffect } from "react";
+import { Navigate, Routes, Route, useLocation } from "react-router-dom";
+import { requestFirebaseNotificationPermission, onMessageListener } from "./config/firebase";
 import Dashboard from "./pages/Dashboard";
 import Navbar from "./components/Navbar";
 import Landing from "./pages/Landing";
@@ -19,6 +20,35 @@ import ProtectedRoute from "./components/ProtectedRoute";
 const APP_ROLES = ["donor", "hospital", "patient", "blood_bank", "ngo"];
 
 function App() {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Only request permission if user is logged in
+    const token = localStorage.getItem("token");
+    if (token) {
+      requestFirebaseNotificationPermission();
+    }
+  }, [location.pathname]); // Re-check when route changes
+
+  useEffect(() => {
+    const handlePushNotification = async () => {
+      try {
+        const payload = await onMessageListener();
+        if (payload && payload.notification) {
+          // Display push notification using browser's native API if in foreground
+          // or you could use a toast library here.
+          new Notification(payload.notification.title, {
+            body: payload.notification.body,
+          });
+        }
+        handlePushNotification(); // Call recursively to listen for the next message
+      } catch (err) {
+        console.error('Failed to listen to FCM messages', err);
+      }
+    };
+    handlePushNotification();
+  }, []);
+
   return (
     <Routes>
       {/* Public Landing & Authentication Routes */}

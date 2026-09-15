@@ -95,8 +95,8 @@ function Donors({ role }) {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 4,
-          mt: 8,
+          p: { xs: 2, sm: 3, md: 4 },
+          mt: { xs: 7, sm: 8 },
         }}
       >
         <Typography

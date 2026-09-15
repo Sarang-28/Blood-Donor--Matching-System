@@ -53,7 +53,7 @@ function RoleSelection() {
       title: "Blood Bank",
       roleKey: "blood_bank",
       icon: "🧪",
-      image: "/role_images/hospital.jpg",
+      image: "/role_images/ngo.jpg",
       path: "/dashboard/blood_bank",
       desc: "Track real-time blood stock inventory across all 8 blood groups.",
     },

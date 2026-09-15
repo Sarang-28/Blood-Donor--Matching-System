@@ -18,6 +18,8 @@ const getMyMatchAlerts = async (req, res, next) => {
                 dm.match_status AS "matchStatus",
                 dm.notified_at AS "notifiedAt",
                 dm.responded_at AS "respondedAt",
+                dm.otp_code AS "otpCode",
+                dm.otp_expires_at AS "otpExpiresAt",
                 br.id AS "requestId",
                 br.blood_group AS "bloodGroup",
                 br.units_required AS "unitsRequired",
@@ -69,16 +71,28 @@ const respondToMatch = async (req, res, next) => {
 
         const matchRecord = verifyRes.rows[0];
 
-        // Update match status
+        let otpCode = null;
+        let otpExpiresAt = null;
+
+        if (response === 'accepted') {
+            // Generate a secure 6-digit OTP
+            otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+            // Expires in 12 hours
+            otpExpiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000);
+        }
+
+        // Update match status and OTP
         const updateSql = `
             UPDATE donor_matches
             SET 
                 match_status = $1,
-                responded_at = CURRENT_TIMESTAMP
+                responded_at = CURRENT_TIMESTAMP,
+                otp_code = $3,
+                otp_expires_at = $4
             WHERE id = $2
             RETURNING *;
         `;
-        const result = await db.query(updateSql, [response, matchId]);
+        const result = await db.query(updateSql, [response, matchId, otpCode, otpExpiresAt]);
 
         // If donor accepted, notify the requester
         if (response === 'accepted') {
@@ -140,6 +154,7 @@ const recordDonation = async (req, res, next) => {
             donorId,
             unitsDonated = 1,
             notes,
+            otpCode,
         } = req.body;
 
         await client.query('BEGIN');
@@ -152,6 +167,46 @@ const recordDonation = async (req, res, next) => {
         }
         const hospitalId = hospQuery.rows[0].id;
 
+        let actualDonorId = donorId;
+
+        // Verify OTP if this is tied to a specific request
+        if (bloodRequestId) {
+            let matchQuery;
+            
+            if (actualDonorId) {
+                matchQuery = await client.query(
+                    'SELECT donor_id, otp_code, otp_expires_at FROM donor_matches WHERE blood_request_id = $1 AND donor_id = $2',
+                    [bloodRequestId, actualDonorId]
+                );
+            } else if (otpCode) {
+                matchQuery = await client.query(
+                    'SELECT donor_id, otp_code, otp_expires_at FROM donor_matches WHERE blood_request_id = $1 AND otp_code = $2',
+                    [bloodRequestId, otpCode]
+                );
+            } else {
+                await client.query('ROLLBACK');
+                return apiError(res, 'Must provide donorId or otpCode for the request.', 400);
+            }
+
+            if (matchQuery.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return apiError(res, 'No match record found or invalid OTP.', 404);
+            }
+
+            const match = matchQuery.rows[0];
+            actualDonorId = match.donor_id; // Set actual donor ID
+            
+            if (!otpCode || match.otp_code !== otpCode) {
+                await client.query('ROLLBACK');
+                return apiError(res, 'Invalid OTP provided. Please verify the code with the donor.', 400);
+            }
+
+            if (new Date() > new Date(match.otp_expires_at)) {
+                await client.query('ROLLBACK');
+                return apiError(res, 'OTP has expired. Please create a new match.', 400);
+            }
+        }
+
         const certNumber = `CERT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
         // 1. Insert into donations table
@@ -161,13 +216,18 @@ const recordDonation = async (req, res, next) => {
                 donor_id,
                 hospital_id,
                 units_donated,
-                donation_date,
                 certificate_number,
                 notes
-            )
-            VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6)
+            ) VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *;
-        `, [bloodRequestId || null, donorId, hospitalId, unitsDonated, certNumber, notes || null]);
+        `, [
+            bloodRequestId || null,
+            actualDonorId,
+            hospitalId,
+            unitsDonated,
+            certNumber,
+            notes || ''
+        ]);
 
         // 2. Update donor's last donation date and total donation count
         await client.query(`

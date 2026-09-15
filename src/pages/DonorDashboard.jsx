@@ -35,7 +35,8 @@ export default function DonorDashboard() {
     const fetchRequests = async () => {
       try {
         setLoading(true);
-        const res = await api.get('/blood-requests');
+        // Fetch personal match alerts instead of all public requests
+        const res = await api.get('/matches/my-alerts');
         setRequests(res.data.data || []);
       } catch (err) {
         console.error('Failed to load emergency blood requests:', err);
@@ -59,18 +60,32 @@ export default function DonorDashboard() {
     }
   };
 
-  const handleRespond = (req) => {
-    setActionMsg({
-      type: 'info',
-      text: `Thank you! Your donation offer for ${req.blood_group || req.bloodGroup} at ${req.hospital_name || req.hospital} has been notified to the hospital.`,
-    });
+  const handleRespond = async (req) => {
+    try {
+      const res = await api.patch(`/matches/${req.matchId}/respond`, { response: 'accepted' });
+      const { otpCode } = res.data.data;
+      
+      // Update local state to hide or mark the match as accepted
+      setRequests(requests.map(r => r.matchId === req.matchId ? { ...r, matchStatus: 'accepted', otpCode } : r));
+
+      setActionMsg({
+        type: 'success',
+        text: `Match accepted! Your OTP is ${otpCode}. Please share this code with the hospital when you donate blood.`,
+      });
+    } catch (err) {
+      console.error('Failed to respond to match:', err);
+      setActionMsg({
+        type: 'error',
+        text: err.response?.data?.message || 'Failed to respond to the match.',
+      });
+    }
   };
 
   return (
     <Box sx={{ display: 'flex', background: '#F6F7FB', minHeight: '100vh' }}>
       <Sidebar role="donor" />
 
-      <Box component="main" sx={{ flexGrow: 1, p: 4, mt: 8 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3, md: 4 }, mt: { xs: 7, sm: 8 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography
             component={motion.h4}
@@ -162,8 +177,17 @@ export default function DonorDashboard() {
         ) : (
           <Grid container spacing={3}>
             {requests.map((req) => (
-              <Grid size={{ xs: 12, md: 6 }} key={req.id}>
-                <RequestCard request={req} onRespond={handleRespond} userRole="donor" />
+              <Grid size={{ xs: 12, md: 6 }} key={req.matchId}>
+                <RequestCard 
+                   request={req} 
+                   onRespond={req.matchStatus === 'pending' ? handleRespond : null} 
+                   userRole="donor" 
+                />
+                {req.matchStatus === 'accepted' && req.otpCode && (
+                  <Alert severity="success" sx={{ mt: 1 }}>
+                    Match Accepted. Your OTP is: <strong>{req.otpCode}</strong>
+                  </Alert>
+                )}
               </Grid>
             ))}
           </Grid>

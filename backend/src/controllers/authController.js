@@ -515,11 +515,31 @@ const logout = async (req, res) => {
     return apiSuccess(res, null, 'Logged out successfully.');
 };
 
+/**
+ * Update FCM Token for Push Notifications
+ */
+const updateFcmToken = async (req, res, next) => {
+    try {
+        const { fcmToken } = req.body;
+        const userId = req.user.id;
+        
+        await db.query(
+            'UPDATE users SET fcm_token = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [fcmToken, userId]
+        );
+
+        return apiSuccess(res, null, 'FCM token updated successfully.');
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     register,
     login,
     adminLogin,
     getMe,
     logout,
+    updateFcmToken,
     getUserProfilesAndRoles,
 };

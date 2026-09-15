@@ -230,7 +230,7 @@ function AdminDashboard() {
     <Box sx={{ display: "flex", background: "#f0f2f5", minHeight: "100vh" }}>
       <AdminSidebar />
 
-      <Box component="main" sx={{ flexGrow: 1, p: 4 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3, md: 4 }, mt: { xs: 7, sm: 8 } }}>
         {/* Top Header */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
           <Typography

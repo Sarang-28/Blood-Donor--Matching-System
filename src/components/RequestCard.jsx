@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 
 const MotionCard = motion.create(Card);
 
-export default function RequestCard({ request, onRespond, userRole }) {
+export default function RequestCard({ request, onRespond, onRecordDonation, userRole }) {
   const isCritical = request.urgency === 'Critical';
   const isUrgent = request.urgency === 'Urgent';
 
@@ -114,6 +114,23 @@ export default function RequestCard({ request, onRespond, userRole }) {
             }}
           >
             {userRole === 'donor' ? 'Offer Blood Donation' : 'View Matching Donors'}
+          </Button>
+        )}
+
+        {onRecordDonation && (
+          <Button
+            fullWidth
+            variant="outlined"
+            color="success"
+            onClick={() => onRecordDonation(request)}
+            sx={{
+              mt: 1,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 700,
+            }}
+          >
+            Record Donation (OTP)
           </Button>
         )}
       </CardContent>

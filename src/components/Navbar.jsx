@@ -18,6 +18,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import MenuIcon from "@mui/icons-material/Menu";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useThemeContext } from "../context/ThemeContext";
@@ -29,7 +30,7 @@ function Navbar() {
   const { role } = useParams();
   const navigate = useNavigate();
   const { user, profile, logout } = useAuth();
-  const { mode, toggleTheme } = useThemeContext();
+  const { mode, toggleTheme, toggleSidebar } = useThemeContext();
   const effectiveRole = role || user?.role || "";
   const formattedRole = effectiveRole ? effectiveRole.replace("_", " ").toUpperCase() : "";
   const displayName = profile?.full_name || profile?.hospital_name || profile?.blood_bank_name || user?.email?.split('@')[0] || "User";
@@ -40,14 +41,25 @@ function Navbar() {
       position="fixed"
       elevation={0}
       sx={{
-        width: `calc(100% - ${drawerWidth}px)`,
-        ml: `${drawerWidth}px`,
+        width: { md: `calc(100% - ${drawerWidth}px)` },
+        ml: { md: `${drawerWidth}px` },
         color: "text.primary",
         borderBottom: "1px solid rgba(0,0,0,0.06)",
       }}
     >
       <Toolbar sx={{ justifyContent: "space-between" }}>
-        {/* Logo */}
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={toggleSidebar}
+            sx={{ mr: 2, display: { md: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          
+          {/* Logo */}
         <Typography
           component={motion.div}
           whileHover={{ scale: 1.04 }}
@@ -67,15 +79,16 @@ function Navbar() {
           >
             🩸
           </motion.span>
-          BloodConnect
-        </Typography>
+            BloodConnect
+          </Typography>
+        </Box>
 
         {/* Search */}
         <Box
           component={motion.div}
           whileFocus={{ scale: 1.01 }}
           sx={{
-            display: "flex",
+            display: { xs: "none", md: "flex" },
             alignItems: "center",
             bgcolor: "#f4f4f4",
             px: 2,
@@ -136,7 +149,7 @@ function Navbar() {
           {/* Notification Bell Menu */}
           <NotificationMenu />
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: 1.5 }}>
             <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}>
               <Avatar
                 sx={{

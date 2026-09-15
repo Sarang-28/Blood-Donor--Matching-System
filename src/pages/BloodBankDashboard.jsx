@@ -98,7 +98,7 @@ export default function BloodBankDashboard({ role = 'blood_bank' }) {
     <Box sx={{ display: 'flex', background: '#F6F7FB', minHeight: '100vh' }}>
       <Sidebar role={role} />
 
-      <Box component="main" sx={{ flexGrow: 1, p: 4, mt: 8 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3, md: 4 }, mt: { xs: 7, sm: 8 } }}>
         <Typography
           component={motion.h4}
           initial={{ opacity: 0, y: -10 }}

@@ -40,6 +40,13 @@ export default function HospitalDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [alertMsg, setAlertMsg] = useState(null);
 
+  // Record Donation Form
+  const [recordDialogOpen, setRecordDialogOpen] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [unitsDonated, setUnitsDonated] = useState(1);
+  const [donationNotes, setDonationNotes] = useState('');
+
   // New Request Form
   const [newRequest, setNewRequest] = useState({
     patientName: '',
@@ -103,11 +110,42 @@ export default function HospitalDashboard() {
     }
   };
 
+  const handleOpenRecordDonation = (req) => {
+    setSelectedRequestId(req.id);
+    setOtpCode('');
+    setUnitsDonated(1);
+    setDonationNotes('');
+    setRecordDialogOpen(true);
+  };
+
+  const handleRecordDonationSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      const payload = {
+        bloodRequestId: selectedRequestId,
+        otpCode,
+        unitsDonated: parseInt(unitsDonated, 10),
+        notes: donationNotes,
+      };
+
+      await api.post('/matches/record-donation', payload);
+      setRecordDialogOpen(false);
+      setAlertMsg({ type: 'success', text: 'Donation successfully recorded and verified using OTP!' });
+      setTimeout(() => setAlertMsg(null), 5000);
+    } catch (err) {
+      console.error('Failed to record donation:', err);
+      setAlertMsg({ type: 'error', text: err.response?.data?.message || 'Failed to record donation.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <Box sx={{ display: 'flex', background: '#F6F7FB', minHeight: '100vh' }}>
       <Sidebar role="hospital" />
 
-      <Box component="main" sx={{ flexGrow: 1, p: 4, mt: 8 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, sm: 3, md: 4 }, mt: { xs: 7, sm: 8 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography
             component={motion.h4}
@@ -196,7 +234,11 @@ export default function HospitalDashboard() {
           <Grid container spacing={3}>
             {requests.map((req) => (
               <Grid size={{ xs: 12, md: 6 }} key={req.id}>
-                <RequestCard request={req} userRole="hospital" />
+                <RequestCard 
+                  request={req} 
+                  userRole="hospital" 
+                  onRecordDonation={handleOpenRecordDonation}
+                />
               </Grid>
             ))}
           </Grid>
@@ -313,6 +355,64 @@ export default function HospitalDashboard() {
             </DialogActions>
           </form>
         </Dialog>
+
+        {/* Record Donation Dialog */}
+        <Dialog open={recordDialogOpen} onClose={() => setRecordDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ fontWeight: 700 }}>Record Blood Donation</DialogTitle>
+          <form onSubmit={handleRecordDonationSubmit}>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enter the 6-digit OTP provided by the donor to verify and record this transfusion handoff.
+              </Typography>
+              
+              <TextField
+                fullWidth
+                label="6-Digit OTP"
+                margin="normal"
+                required
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                inputProps={{ maxLength: 6 }}
+              />
+
+              <TextField
+                fullWidth
+                type="number"
+                label="Units Donated"
+                margin="normal"
+                required
+                inputProps={{ min: 1 }}
+                value={unitsDonated}
+                onChange={(e) => setUnitsDonated(e.target.value)}
+              />
+
+              <TextField
+                fullWidth
+                label="Medical Notes (Optional)"
+                margin="normal"
+                multiline
+                rows={2}
+                value={donationNotes}
+                onChange={(e) => setDonationNotes(e.target.value)}
+              />
+            </DialogContent>
+            <DialogActions sx={{ p: 2.5 }}>
+              <Button onClick={() => setRecordDialogOpen(false)} sx={{ textTransform: 'none' }}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                color="success"
+                disabled={submitting}
+                sx={{ textTransform: 'none', fontWeight: 600, px: 3 }}
+              >
+                {submitting ? <CircularProgress size={22} color="inherit" /> : 'Verify & Record'}
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
+
       </Box>
     </Box>
   );

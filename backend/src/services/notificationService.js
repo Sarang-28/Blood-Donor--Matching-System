@@ -1,7 +1,7 @@
 const db = require('../config/db');
 const { NOTIFICATION_TYPE } = require('../constants/statuses');
 const twilioService = require('./twilioService');
-
+const firebaseAdmin = require('../config/firebase');
 class NotificationService {
     /**
      * Store in-app notification in PostgreSQL
@@ -53,19 +53,50 @@ class NotificationService {
             const smsText = `EMERGENCY BLOOD ALERT: ${units} unit(s) of ${bloodGroup} needed at ${hospitalName} (${distanceKm}km away). Please check your Blood Donor app to respond.`;
             await twilioService.sendSms(phone, smsText);
         }
+
+        // 3. FCM Push Notification
+        await this.sendFcmPushNotification(userId, title, body, { requestId, type: NOTIFICATION_TYPE.MATCH_ALERT });
+    }
+
+    /**
+     * Helper: Fetch user FCM token and send push notification
+     */
+    async sendFcmPushNotification(userId, title, body, payload = {}) {
+        if (!firebaseAdmin || !firebaseAdmin.apps.length) return; // Not configured
+
+        try {
+            const res = await db.query('SELECT fcm_token FROM users WHERE id = $1', [userId]);
+            if (res.rows.length && res.rows[0].fcm_token) {
+                await firebaseAdmin.messaging().send({
+                    token: res.rows[0].fcm_token,
+                    notification: {
+                        title,
+                        body,
+                    },
+                    data: {
+                        ...payload,
+                        click_action: 'FLUTTER_NOTIFICATION_CLICK', // standard fallback
+                    },
+                });
+            }
+        } catch (error) {
+            console.error(`Failed to send FCM to user ${userId}:`, error.message);
+        }
     }
 
     /**
      * Send status update to blood requester
      */
     async notifyRequesterStatusUpdate({ userId, title, body, requestId, newStatus }) {
-        return this.createInAppNotification({
+        await this.createInAppNotification({
             userId,
             title,
             body,
             type: NOTIFICATION_TYPE.REQUEST_UPDATE,
             payload: { requestId, newStatus },
         });
+
+        await this.sendFcmPushNotification(userId, title, body, { requestId, newStatus, type: NOTIFICATION_TYPE.REQUEST_UPDATE });
     }
 
     /**
@@ -78,13 +109,15 @@ class NotificationService {
             ? `Congratulations! ${institutionName} has been verified by administrators.`
             : `Your verification request was reviewed: ${remarks || 'Please update your details.'}`;
 
-        return this.createInAppNotification({
+        await this.createInAppNotification({
             userId,
             title,
             body,
             type: NOTIFICATION_TYPE.VERIFICATION,
             payload: { status, remarks },
         });
+
+        await this.sendFcmPushNotification(userId, title, body, { status, type: NOTIFICATION_TYPE.VERIFICATION });
     }
 }
 

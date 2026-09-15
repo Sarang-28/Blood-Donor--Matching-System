@@ -339,6 +339,7 @@ function Landing() {
                   borderRadius: 3,
                   textTransform: "none",
                   backdropFilter: "blur(10px)",
+                  display: { xs: "none", sm: "inline-flex" },
                   "&:hover": {
                     borderColor: "#fff",
                     bgcolor: "rgba(255,255,255,0.05)",
@@ -778,7 +779,7 @@ function Landing() {
               <Grid container spacing={3} alignItems="center">
                 {/* Left: Blood Drop / Bag Silhouette with Liquid Wave Animation */}
                 <Grid size={{ xs: 12, md: 4 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, gap: 3 }}>
                     {/* Animated Blood Bag Silhouette */}
                     <Box
                       sx={{
@@ -869,6 +870,9 @@ function Landing() {
                           bgcolor: "rgba(229, 56, 77, 0.2)",
                           color: "#FF6B81",
                           border: "1px solid rgba(229, 56, 77, 0.4)",
+                          height: "auto",
+                          py: 0.5,
+                          "& .MuiChip-label": { whiteSpace: "normal" }
                         }}
                       />
                       {/* Fixed "Ghost" Text with high-contrast #CBD5E1 */}
@@ -911,6 +915,8 @@ function Landing() {
                             color: "#4ADE80",
                             fontWeight: 800,
                             border: "1px solid rgba(74, 222, 128, 0.3)",
+                            height: "auto",
+                            "& .MuiChip-label": { whiteSpace: "normal" }
                           }}
                         />
                       ))}
@@ -947,6 +953,8 @@ function Landing() {
                             color: "#60A5FA",
                             fontWeight: 800,
                             border: "1px solid rgba(96, 165, 250, 0.3)",
+                            height: "auto",
+                            "& .MuiChip-label": { whiteSpace: "normal" }
                           }}
                         />
                       ))}

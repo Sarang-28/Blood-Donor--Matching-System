@@ -22,6 +22,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useThemeContext } from "../context/ThemeContext";
 
 const drawerWidth = 240;
 
@@ -29,6 +30,7 @@ function Sidebar({ role }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { mobileOpen, toggleSidebar } = useThemeContext();
 
   const menuItems = [
     { text: "Dashboard", pathId: "dashboard", icon: <DashboardIcon /> },
@@ -64,19 +66,9 @@ function Sidebar({ role }) {
     { text: "Profile", pathId: "profile", icon: <PersonIcon /> },
   ];
 
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: drawerWidth,
-        "& .MuiDrawer-paper": {
-          width: drawerWidth,
-          boxSizing: "border-box",
-        },
-      }}
-    >
+  const drawerContent = (
+    <>
       <Toolbar />
-
       <Box sx={{ px: 2, pt: 1, pb: 2 }}>
         <Typography
           variant="caption"
@@ -100,6 +92,7 @@ function Sidebar({ role }) {
                 selected={isSelected}
                 onClick={() => {
                   navigate(`/${item.pathId}/${role}`);
+                  if (mobileOpen) toggleSidebar();
                 }}
                 sx={{ position: "relative", overflow: "hidden" }}
               >
@@ -168,7 +161,10 @@ function Sidebar({ role }) {
           color="primary"
           size="small"
           startIcon={<SwapHorizIcon />}
-          onClick={() => navigate("/roles")}
+          onClick={() => {
+            navigate("/roles");
+            if (mobileOpen) toggleSidebar();
+          }}
           sx={{ mb: 1, borderRadius: 2, textTransform: "none", fontWeight: 600 }}
         >
           Switch Role
@@ -182,13 +178,51 @@ function Sidebar({ role }) {
           onClick={() => {
             logout();
             navigate("/");
+            if (mobileOpen) toggleSidebar();
           }}
           sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
         >
           Sign Out
         </Button>
       </Box>
-    </Drawer>
+    </>
+  );
+
+  return (
+    <Box
+      component="nav"
+      sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+    >
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={toggleSidebar}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile.
+        }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+    </Box>
   );
 }
 

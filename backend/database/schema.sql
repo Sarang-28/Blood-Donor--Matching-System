@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
     role user_role NOT NULL,
     phone VARCHAR(20) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
+    fcm_token VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -155,6 +156,8 @@ CREATE TABLE IF NOT EXISTS donor_matches (
     match_status match_status DEFAULT 'notified',
     notified_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     responded_at TIMESTAMP WITH TIME ZONE,
+    otp_code VARCHAR(6),
+    otp_expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(blood_request_id, donor_id)
 );

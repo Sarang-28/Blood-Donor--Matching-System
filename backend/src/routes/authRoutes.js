@@ -71,4 +71,19 @@ router.get('/me', authenticateToken, authController.getMe);
  */
 router.post('/logout', authenticateToken, authController.logout);
 
+/**
+ * @route   PUT /api/auth/fcm-token
+ * @desc    Update FCM device token for push notifications
+ * @access  Private
+ */
+router.put(
+    '/fcm-token',
+    authenticateToken,
+    [
+        body('fcmToken').notEmpty().withMessage('fcmToken is required'),
+        validate,
+    ],
+    authController.updateFcmToken
+);
+
 module.exports = router;
