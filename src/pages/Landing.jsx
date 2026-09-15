@@ -230,7 +230,7 @@ function Landing() {
                 <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: "-0.5px", lineHeight: 1.1 }}>
                   Blood<span style={{ color: "#E5384D" }}>Match</span>
                 </Typography>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.7rem", letterSpacing: "1px" }}>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.7rem", letterSpacing: "1px", display: { xs: 'none', sm: 'block' } }}>
                   HYPERLOCAL NETWORK
                 </Typography>
               </Box>
@@ -308,10 +308,10 @@ function Landing() {
                   background: "linear-gradient(135deg, #E5384D, #B71C1C)",
                   color: "#fff",
                   fontWeight: 700,
-                  px: { xs: 1.5, sm: 2.5 },
-                  py: 1,
+                  px: { xs: 1, sm: 2.5 },
+                  py: { xs: 0.5, sm: 1 },
                   borderRadius: 3,
-                  fontSize: { xs: "0.8rem", sm: "0.9rem" },
+                  fontSize: { xs: "0.7rem", sm: "0.9rem" },
                   textTransform: "none",
                   boxShadow: "0 0 20px rgba(229,56,77,0.5)",
                   animation: "pulse 2s infinite",
@@ -321,9 +321,9 @@ function Landing() {
                     "100%": { boxShadow: "0 0 0 0 rgba(229, 56, 77, 0)" },
                   },
                 }}
-                startIcon={<NotificationsActiveIcon />}
+                startIcon={<NotificationsActiveIcon sx={{ display: { xs: 'none', sm: 'inline-block' } }}/>}
               >
-                Emergency SOS
+                SOS
               </Button>
 
               <Button
@@ -334,18 +334,19 @@ function Landing() {
                   borderColor: "rgba(255, 255, 255, 0.2)",
                   color: "#fff",
                   fontWeight: 600,
-                  px: 2.5,
-                  py: 1,
+                  px: { xs: 1, sm: 2.5 },
+                  py: { xs: 0.5, sm: 1 },
+                  fontSize: { xs: "0.7rem", sm: "0.9rem" },
                   borderRadius: 3,
                   textTransform: "none",
                   backdropFilter: "blur(10px)",
-                  display: { xs: "none", sm: "inline-flex" },
+                  display: "inline-flex",
                   "&:hover": {
                     borderColor: "#fff",
                     bgcolor: "rgba(255,255,255,0.05)",
                   },
                 }}
-                startIcon={<LoginIcon />}
+                startIcon={<LoginIcon sx={{ display: { xs: 'none', sm: 'inline-block' } }} />}
               >
                 Sign In
               </Button>

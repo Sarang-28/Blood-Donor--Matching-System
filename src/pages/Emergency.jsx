@@ -16,6 +16,8 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SendIcon from '@mui/icons-material/Send';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -33,9 +35,22 @@ export default function Emergency() {
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const { user } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!user) {
+      setResult({
+        type: 'error',
+        text: 'You must be signed in to broadcast an emergency request.',
+        action: (
+          <Button color="inherit" size="small" component={Link} to="/login">
+            Sign In
+          </Button>
+        )
+      });
+      return;
+    }
     try {
       setLoading(true);
       setResult(null);
@@ -80,8 +95,27 @@ export default function Emergency() {
             </Box>
 
             {result && (
-              <Alert severity={result.type} sx={{ mb: 3, borderRadius: 2 }}>
+              <Alert 
+                severity={result.type} 
+                sx={{ mb: 3, borderRadius: 2 }}
+                action={result.action}
+              >
                 {result.text}
+              </Alert>
+            )}
+
+            {/* If user is not logged in, they can still see the form but can't submit without a warning, or we can just warn them above. */}
+            {!user && !result && (
+              <Alert 
+                severity="warning" 
+                sx={{ mb: 3, borderRadius: 2 }}
+                action={
+                  <Button color="inherit" size="small" component={Link} to="/login">
+                    Sign In
+                  </Button>
+                }
+              >
+                Please sign in to broadcast an emergency request.
               </Alert>
             )}
 

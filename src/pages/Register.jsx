@@ -140,7 +140,7 @@ function Register() {
           },
         });
       } else {
-        navigate("/", {
+        navigate("/login", {
           state: {
             successMessage: "Registration successful! Please sign in with your email and password.",
             registeredEmail: formData.email,
