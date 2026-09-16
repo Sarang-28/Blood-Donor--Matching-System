@@ -21,6 +21,7 @@ import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import RequestCard from '../components/RequestCard';
+import LiveLocationBroadcaster from '../components/LiveLocationBroadcaster';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -184,9 +185,12 @@ export default function DonorDashboard() {
                    userRole="donor" 
                 />
                 {req.matchStatus === 'accepted' && req.otpCode && (
-                  <Alert severity="success" sx={{ mt: 1 }}>
-                    Match Accepted. Your OTP is: <strong>{req.otpCode}</strong>
-                  </Alert>
+                  <Box sx={{ mt: 2 }}>
+                    <Alert severity="success" sx={{ mb: 2 }}>
+                      Match Accepted. Your OTP is: <strong>{req.otpCode}</strong>
+                    </Alert>
+                    <LiveLocationBroadcaster matchId={req.matchId} />
+                  </Box>
                 )}
               </Grid>
             ))}

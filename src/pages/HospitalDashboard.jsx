@@ -26,6 +26,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import RequestCard from '../components/RequestCard';
+import TrackDonorsDialog from '../components/TrackDonorsDialog';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -116,6 +117,15 @@ export default function HospitalDashboard() {
     setUnitsDonated(1);
     setDonationNotes('');
     setRecordDialogOpen(true);
+  };
+
+  // Track Donors Dialog
+  const [trackDialogOpen, setTrackDialogOpen] = useState(false);
+  const [trackingRequestId, setTrackingRequestId] = useState(null);
+
+  const handleOpenTrackDonors = (req) => {
+    setTrackingRequestId(req.id);
+    setTrackDialogOpen(true);
   };
 
   const handleRecordDonationSubmit = async (e) => {
@@ -238,6 +248,7 @@ export default function HospitalDashboard() {
                   request={req} 
                   userRole="hospital" 
                   onRecordDonation={handleOpenRecordDonation}
+                  onRespond={() => handleOpenTrackDonors(req)}
                 />
               </Grid>
             ))}
@@ -412,6 +423,12 @@ export default function HospitalDashboard() {
             </DialogActions>
           </form>
         </Dialog>
+
+        <TrackDonorsDialog
+          open={trackDialogOpen}
+          onClose={() => setTrackDialogOpen(false)}
+          requestId={trackingRequestId}
+        />
 
       </Box>
     </Box>
