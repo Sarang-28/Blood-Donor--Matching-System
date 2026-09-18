@@ -31,6 +31,18 @@ router.patch(
 );
 
 /**
+ * @route   POST /api/matches/manual-offer
+ * @desc    Donor manually volunteers for a public blood request
+ * @access  Private (Donor only)
+ */
+router.post(
+    '/manual-offer',
+    authenticateToken,
+    authorizeRoles(ROLES.DONOR),
+    matchingController.manualOffer
+);
+
+/**
  * @route   POST /api/matches/:requestId/trigger
  * @desc    Manually trigger or re-run PostGIS matching for a blood request
  * @access  Private (Hospital, Admin)

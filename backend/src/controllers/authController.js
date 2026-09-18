@@ -32,12 +32,11 @@ const generateToken = (user, availableRoles = []) => {
  * Fetch all registered profiles and active roles for a user
  */
 const getUserProfilesAndRoles = async (userId, primaryRole) => {
-    const [donorRes, patientRes, hospitalRes, bbRes, ngoRes] = await Promise.all([
+    const [donorRes, patientRes, hospitalRes, bbRes] = await Promise.all([
         db.query('SELECT * FROM donors WHERE user_id = $1', [userId]),
         db.query('SELECT * FROM patients WHERE user_id = $1', [userId]),
         db.query('SELECT * FROM hospitals WHERE user_id = $1', [userId]),
         db.query('SELECT * FROM blood_banks WHERE user_id = $1', [userId]),
-        db.query('SELECT * FROM ngos WHERE user_id = $1', [userId]),
     ]);
 
     const availableRoles = [];
@@ -58,12 +57,6 @@ const getUserProfilesAndRoles = async (userId, primaryRole) => {
     if (bbRes.rows.length > 0) {
         availableRoles.push('blood_bank');
         profiles.blood_bank = bbRes.rows[0];
-    }
-    if (ngoRes.rows.length > 0) {
-        availableRoles.push('blood_bank');
-        availableRoles.push('ngo');
-        profiles.ngo = ngoRes.rows[0];
-        if (!profiles.blood_bank) profiles.blood_bank = ngoRes.rows[0];
     }
     if (primaryRole === 'admin') {
         availableRoles.push('admin');
@@ -169,7 +162,7 @@ const register = async (req, res, next) => {
             if (effectiveRole === ROLES.DONOR) tableToCheck = 'donors';
             else if (effectiveRole === ROLES.PATIENT) tableToCheck = 'patients';
             else if (effectiveRole === ROLES.HOSPITAL) tableToCheck = 'hospitals';
-            else if (effectiveRole === ROLES.BLOOD_BANK || effectiveRole === 'ngo') tableToCheck = 'ngos';
+            else if (effectiveRole === ROLES.BLOOD_BANK || effectiveRole === 'ngo') tableToCheck = 'blood_banks';
 
             if (tableToCheck) {
                 const roleExists = await client.query(
@@ -196,7 +189,7 @@ const register = async (req, res, next) => {
             const salt = await bcrypt.genSalt(10);
             const passwordHash = await bcrypt.hash(password, salt);
 
-            const dbRole = (effectiveRole === 'blood_bank' || effectiveRole === ROLES.BLOOD_BANK) ? 'ngo' : effectiveRole;
+            const dbRole = (effectiveRole === 'ngo') ? ROLES.BLOOD_BANK : effectiveRole;
 
             // Insert into users table
             const userInsert = await client.query(
@@ -303,29 +296,29 @@ const register = async (req, res, next) => {
             const address = bloodBankAddress || ngoAddress || locationName;
             const areas = areasOfOperation || 'Pune District';
 
-            const ngoInsert = await client.query(
-                `INSERT INTO ngos (
-                    user_id, ngo_name, registration_number, coordinator_name, contact_number,
-                    areas_of_operation, address, geom
+            const bbInsert = await client.query(
+                `INSERT INTO blood_banks (
+                    user_id, blood_bank_name, license_number, director_name, contact_number,
+                    operating_hours, address, geom
                 )
                 VALUES (
                     $1, $2, $3, $4, $5, $6, $7,
                     ST_SetSRID(ST_MakePoint($8, $9), 4326)
                 )
-                RETURNING id, ngo_name, registration_number, coordinator_name, contact_number, areas_of_operation, address, verification_status;`,
+                RETURNING id, blood_bank_name, license_number, director_name, contact_number, operating_hours, address, verification_status;`,
                 [
                     targetUser.id,
                     name,
                     licenseNo,
                     director,
                     contact,
-                    areas,
+                    operatingHours || '24/7',
                     address,
                     coords.longitude,
                     coords.latitude,
                 ]
             );
-            profileData = ngoInsert.rows[0];
+            profileData = bbInsert.rows[0];
         }
 
         await client.query('COMMIT');

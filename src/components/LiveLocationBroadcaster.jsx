@@ -86,8 +86,7 @@ const LiveLocationBroadcaster = ({ matchId }) => {
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <CircularProgress size={20} sx={{ mr: 2 }} />
-            <Typography variant="body1" color="primary">Broadcasting Location...</Typography>
+            <Typography variant="body1" color="success.main" sx={{ fontWeight: 'bold' }}>📍 Live tracking active</Typography>
           </Box>
           <Button 
             variant="outlined" 

@@ -27,7 +27,8 @@ const getMyMatchAlerts = async (req, res, next) => {
                 br.hospital_name AS "hospitalName",
                 br.location_name AS "locationName",
                 br.contact_phone AS "contactPhone",
-                br.status AS "requestStatus"
+                br.status AS "requestStatus",
+                br.patient_name AS "patientName"
             FROM donor_matches dm
             JOIN donors d ON dm.donor_id = d.id
             JOIN blood_requests br ON dm.blood_request_id = br.id
@@ -281,9 +282,44 @@ const recordDonation = async (req, res, next) => {
     }
 };
 
+/**
+ * Manually offer blood for a public request
+ */
+const manualOffer = async (req, res, next) => {
+    try {
+        const { requestId } = req.body;
+        
+        // check if donor already has a match
+        const existingMatch = await db.query(
+            'SELECT dm.id FROM donor_matches dm JOIN donors d ON dm.donor_id = d.id WHERE d.user_id = $1 AND dm.blood_request_id = $2', 
+            [req.user.id, requestId]
+        );
+        
+        if (existingMatch.rows.length > 0) {
+             await db.query('UPDATE donor_matches SET match_status = $1, responded_at = CURRENT_TIMESTAMP WHERE id = $2', ['accepted', existingMatch.rows[0].id]);
+             return apiSuccess(res, null, 'You have accepted this request!');
+        }
+        
+        const donorResult = await db.query('SELECT id FROM donors WHERE user_id = $1', [req.user.id]);
+        if (donorResult.rows.length === 0) return apiError(res, 'Donor profile not found', 404);
+        const donorId = donorResult.rows[0].id;
+        
+        const insertSql = `
+            INSERT INTO donor_matches (blood_request_id, donor_id, distance_meters, is_exact_group, match_status, responded_at)
+            VALUES ($1, $2, 0, true, 'accepted', CURRENT_TIMESTAMP)
+            RETURNING *;
+        `;
+        const newMatch = await db.query(insertSql, [requestId, donorId]);
+        return apiSuccess(res, newMatch.rows[0], 'You have successfully offered to donate blood!');
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getMyMatchAlerts,
     respondToMatch,
     matchRequest,
     recordDonation,
+    manualOffer,
 };

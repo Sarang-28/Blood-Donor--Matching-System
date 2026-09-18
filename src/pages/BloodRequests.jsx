@@ -26,6 +26,17 @@ import { useAuth } from "../context/AuthContext";
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const URGENCIES = ["Normal", "Urgent", "Critical"];
 
+const BLOOD_COMPATIBILITY = {
+    'A+': ['A+', 'A-', 'O+', 'O-'],
+    'A-': ['A-', 'O-'],
+    'B+': ['B+', 'B-', 'O+', 'O-'],
+    'B-': ['B-', 'O-'],
+    'AB+': ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+    'AB-': ['AB-', 'A-', 'B-', 'O-'],
+    'O+': ['O+', 'O-'],
+    'O-': ['O-'],
+};
+
 function BloodRequests({ role }) {
   const { profile } = useAuth();
   const [requests, setRequests] = useState([]);
@@ -85,6 +96,15 @@ function BloodRequests({ role }) {
       setAlertMsg({ type: "error", text: err.response?.data?.message || "Failed to post request." });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleManualOffer = async (req) => {
+    try {
+      await api.post("/matches/manual-offer", { requestId: req.id });
+      setAlertMsg({ type: "success", text: "Thank you for offering to donate! You can track this in your Donor Dashboard." });
+    } catch (err) {
+      setAlertMsg({ type: "error", text: err.response?.data?.message || "Failed to offer blood." });
     }
   };
 
@@ -206,11 +226,27 @@ function BloodRequests({ role }) {
           </Card>
         ) : (
           <Grid container spacing={3}>
-            {filteredRequests.map((req) => (
-              <Grid size={{ xs: 12, md: 6 }} key={req.id || Math.random()}>
-                <RequestCard request={req} userRole={role} />
-              </Grid>
-            ))}
+            {filteredRequests.map((req) => {
+              const reqGroup = req.bloodGroup || req.blood_group;
+              const myGroup = profile?.blood_group || profile?.bloodGroup;
+              const normalizedRole = (role || "").toLowerCase();
+              
+              let canDonate = true;
+              if (normalizedRole === 'donor') {
+                  const compatibleDonors = BLOOD_COMPATIBILITY[reqGroup] || [];
+                  canDonate = compatibleDonors.includes(myGroup);
+              }
+
+              return (
+                <Grid size={{ xs: 12, md: 6 }} key={req.id || Math.random()}>
+                  <RequestCard 
+                    request={req} 
+                    userRole={normalizedRole} 
+                    onRespond={canDonate || normalizedRole !== 'donor' ? handleManualOffer : undefined} 
+                  />
+                </Grid>
+              );
+            })}
           </Grid>
         )}
 

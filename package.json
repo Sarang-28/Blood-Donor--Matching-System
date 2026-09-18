@@ -29,6 +29,7 @@
     "leaflet": "^1.9.4",
     "morgan": "^1.12.1",
     "pg": "^8.23.0",
+    "puppeteer": "^25.11.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-icons": "^5.7.0",

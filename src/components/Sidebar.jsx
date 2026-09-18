@@ -151,7 +151,7 @@ function Sidebar({ role }) {
               {user.email}
             </Typography>
             <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 600, textTransform: "uppercase" }}>
-              Role: {user.role?.replace("_", " ")}
+              Role: {role?.replace("_", " ")}
             </Typography>
           </Box>
         )}

@@ -26,8 +26,7 @@ import NotificationMenu from "./NotificationMenu";
 
 const drawerWidth = 240;
 
-function Navbar() {
-  const { role } = useParams();
+function Navbar({ role }) {
   const navigate = useNavigate();
   const { user, profile, logout } = useAuth();
   const { mode, toggleTheme, toggleSidebar } = useThemeContext();

@@ -87,7 +87,7 @@ function App() {
           element={
             <ProtectedRoute>
               <>
-                <Navbar />
+                <Navbar role={role} />
                 <BloodRequests role={role} />
               </>
             </ProtectedRoute>
@@ -103,7 +103,7 @@ function App() {
           element={
             <ProtectedRoute>
               <>
-                <Navbar />
+                <Navbar role={role} />
                 <Donors role={role} />
               </>
             </ProtectedRoute>
@@ -119,7 +119,7 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["blood_bank", "ngo", "admin"]}>
               <>
-                <Navbar />
+                <Navbar role={role} />
                 <BloodBankDashboard role={role} />
               </>
             </ProtectedRoute>
@@ -135,7 +135,7 @@ function App() {
           element={
             <ProtectedRoute>
               <>
-                <Navbar />
+                <Navbar role={role} />
                 <Dashboard role={role} />
               </>
             </ProtectedRoute>
@@ -151,7 +151,7 @@ function App() {
           element={
             <ProtectedRoute>
               <>
-                <Navbar />
+                <Navbar role={role} />
                 <Profile role={role} />
               </>
             </ProtectedRoute>

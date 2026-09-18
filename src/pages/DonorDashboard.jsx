@@ -51,7 +51,7 @@ export default function DonorDashboard() {
   const handleToggleAvailability = async (e) => {
     const nextStatus = e.target.checked ? 'Available' : 'Unavailable';
     try {
-      await api.put('/donors/profile/me', { availabilityStatus: nextStatus });
+      await api.patch('/donors/availability', { status: nextStatus });
       setIsAvailable(e.target.checked);
       setActionMsg({ type: 'success', text: `Availability status updated to ${nextStatus}.` });
       setTimeout(() => setActionMsg(null), 3500);
@@ -181,13 +181,13 @@ export default function DonorDashboard() {
               <Grid size={{ xs: 12, md: 6 }} key={req.matchId}>
                 <RequestCard 
                    request={req} 
-                   onRespond={req.matchStatus === 'pending' ? handleRespond : null} 
+                   onRespond={req.matchStatus !== 'accepted' ? handleRespond : null} 
                    userRole="donor" 
                 />
                 {req.matchStatus === 'accepted' && req.otpCode && (
                   <Box sx={{ mt: 2 }}>
                     <Alert severity="success" sx={{ mb: 2 }}>
-                      Match Accepted. Your OTP is: <strong>{req.otpCode}</strong>
+                      Match Accepted. The hospital has been notified.
                     </Alert>
                     <LiveLocationBroadcaster matchId={req.matchId} />
                   </Box>
