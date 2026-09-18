@@ -1,6 +1,6 @@
 let bcrypt;
 try {
-    bcrypt = require('bcrypt');
+    bcrypt = require('bcryptjs');
 } catch (e) {
     bcrypt = require('bcryptjs');
 }
