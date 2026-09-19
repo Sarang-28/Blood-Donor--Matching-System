@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import api from '../services/api';
 import LiveTrackerMap from './LiveTrackerMap';
+import { useSocket } from '../context/SocketContext';
 
 export default function TrackDonorsDialog({ open, onClose, requestId }) {
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,24 @@ export default function TrackDonorsDialog({ open, onClose, requestId }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, requestId]);
+
+  const socket = useSocket();
+
+  useEffect(() => {
+    if (!socket || !open || !requestId) return;
+
+    socket.emit('join_tracking_room', { matchId: requestId, role: 'patient' });
+
+    socket.on('match_accepted', (newMatchData) => {
+      // Re-fetch matches when a donor accepts
+      fetchMatches();
+    });
+
+    return () => {
+      socket.off('match_accepted');
+      socket.emit('leave_tracking_room', { matchId: requestId });
+    };
+  }, [socket, open, requestId]);
 
   const fetchMatches = async () => {
     try {

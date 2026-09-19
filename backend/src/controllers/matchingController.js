@@ -282,35 +282,82 @@ const recordDonation = async (req, res, next) => {
     }
 };
 
-/**
- * Manually offer blood for a public request
- */
 const manualOffer = async (req, res, next) => {
     try {
         const { requestId } = req.body;
         
-        // check if donor already has a match
-        const existingMatch = await db.query(
-            'SELECT dm.id FROM donor_matches dm JOIN donors d ON dm.donor_id = d.id WHERE d.user_id = $1 AND dm.blood_request_id = $2', 
-            [req.user.id, requestId]
-        );
+        // 1. Fetch the Blood Request to ensure it is active and get its blood group
+        const requestQuery = await db.query('SELECT status, blood_group, requester_user_id FROM blood_requests WHERE id = $1', [requestId]);
+        if (requestQuery.rows.length === 0) return apiError(res, 'Blood request not found', 404);
         
-        if (existingMatch.rows.length > 0) {
-             await db.query('UPDATE donor_matches SET match_status = $1, responded_at = CURRENT_TIMESTAMP WHERE id = $2', ['accepted', existingMatch.rows[0].id]);
-             return apiSuccess(res, null, 'You have accepted this request!');
+        const requestStatus = requestQuery.rows[0].status;
+        if (requestStatus !== 'active' && requestStatus !== 'matching') {
+            return apiError(res, 'This blood request is no longer open for offers.', 400);
         }
         
-        const donorResult = await db.query('SELECT id FROM donors WHERE user_id = $1', [req.user.id]);
+        // 2. Fetch the Donor profile and verify compatibility
+        const donorResult = await db.query('SELECT id, blood_group, full_name, user_id FROM donors WHERE user_id = $1', [req.user.id]);
         if (donorResult.rows.length === 0) return apiError(res, 'Donor profile not found', 404);
-        const donorId = donorResult.rows[0].id;
         
-        const insertSql = `
-            INSERT INTO donor_matches (blood_request_id, donor_id, distance_meters, is_exact_group, match_status, responded_at)
-            VALUES ($1, $2, 0, true, 'accepted', CURRENT_TIMESTAMP)
-            RETURNING *;
-        `;
-        const newMatch = await db.query(insertSql, [requestId, donorId]);
-        return apiSuccess(res, newMatch.rows[0], 'You have successfully offered to donate blood!');
+        const donor = donorResult.rows[0];
+        const { getCompatibleDonorGroups } = require('../constants/bloodCompatibility');
+        const compatibleGroups = getCompatibleDonorGroups(requestQuery.rows[0].blood_group);
+        
+        if (!compatibleGroups.includes(donor.blood_group)) {
+            return apiError(res, `Your blood group (${donor.blood_group}) is not compatible with this request (${requestQuery.rows[0].blood_group}).`, 400);
+        }
+        
+        // 3. check if donor already has a match
+        const existingMatch = await db.query(
+            'SELECT id FROM donor_matches WHERE donor_id = $1 AND blood_request_id = $2', 
+            [donor.id, requestId]
+        );
+        
+        let matchRecord;
+        if (existingMatch.rows.length > 0) {
+             const updateResult = await db.query('UPDATE donor_matches SET match_status = $1, responded_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *', ['accepted', existingMatch.rows[0].id]);
+             matchRecord = updateResult.rows[0];
+        } else {
+            const insertSql = `
+                INSERT INTO donor_matches (blood_request_id, donor_id, distance_meters, is_exact_group, match_status, responded_at)
+                SELECT 
+                    $1, 
+                    $2, 
+                    COALESCE(ROUND((ST_Distance(d.geom::geography, br.geom::geography))::numeric, 2), 0), 
+                    $3, 
+                    'accepted', 
+                    CURRENT_TIMESTAMP
+                FROM donors d
+                JOIN blood_requests br ON br.id = $1
+                WHERE d.id = $2
+                RETURNING *;
+            `;
+            const isExactGroup = donor.blood_group === requestQuery.rows[0].blood_group;
+            const newMatch = await db.query(insertSql, [requestId, donor.id, isExactGroup]);
+            matchRecord = newMatch.rows[0];
+        }
+        
+        // 4. Emit match_accepted via Socket.IO
+        try {
+            const { getIo } = require('../config/socket');
+            const io = getIo();
+            // Get user phone
+            const userPhoneQuery = await db.query('SELECT phone FROM users WHERE id = $1', [donor.user_id]);
+            const phone = userPhoneQuery.rows.length > 0 ? userPhoneQuery.rows[0].phone : '';
+            
+            io.to(`tracking_${requestId}`).emit('match_accepted', {
+                matchSessionId: matchRecord.id,
+                donor: {
+                    name: donor.full_name,
+                    phone: phone,
+                    bloodGroup: donor.blood_group,
+                }
+            });
+        } catch (socketErr) {
+            console.error("Socket emission failed:", socketErr);
+        }
+
+        return apiSuccess(res, matchRecord, 'You have successfully offered to donate blood! Please start sharing your location.');
     } catch (error) {
         next(error);
     }

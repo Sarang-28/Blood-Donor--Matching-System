@@ -1,16 +1,92 @@
-import React from 'react';
-import { Card, CardContent, Typography, Box, Chip, Button } from '@mui/material';
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, Typography, Box, Chip, Button, CircularProgress } from '@mui/material';
 import BloodtypeIcon from '@mui/icons-material/Bloodtype';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
+import StopIcon from '@mui/icons-material/Stop';
 import { motion } from 'framer-motion';
+import { useSocket } from '../context/SocketContext';
 
 const MotionCard = motion.create(Card);
 
-export default function RequestCard({ request, onRespond, onRecordDonation, userRole }) {
+export default function RequestCard({ request, onRespond, onRecordDonation, onTrack, userRole, isOwner }) {
   const isCritical = request.urgency === 'Critical';
   const isUrgent = request.urgency === 'Urgent';
+
+  const socket = useSocket();
+  const [matchStatus, setMatchStatus] = useState(request.matchStatus || null); 
+  const [isSharing, setIsSharing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeMatchId, setActiveMatchId] = useState(null);
+  const watchIdRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  const handleOfferClick = async () => {
+    if (!onRespond) return;
+    setLoading(true);
+    try {
+      const matchId = await onRespond(request);
+      if (matchId) {
+        setActiveMatchId(matchId);
+        setMatchStatus('ACCEPTED');
+      }
+    } catch (err) {
+      console.error('Failed to accept offer:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartSharing = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    if (!activeMatchId) return;
+
+    socket.emit('join_tracking_room', { matchId: activeMatchId, role: 'donor' });
+    setIsSharing(true);
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        socket.emit('location_update', {
+          matchId: activeMatchId,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+      },
+      (error) => {
+        console.error('Geolocation tracking error:', error);
+        handleStopSharing();
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 10000
+      }
+    );
+  };
+
+  const handleStopSharing = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsSharing(false);
+    if (activeMatchId) {
+        socket.emit('leave_tracking_room', { matchId: activeMatchId });
+    }
+  };
 
   return (
     <MotionCard
@@ -75,7 +151,7 @@ export default function RequestCard({ request, onRespond, onRecordDonation, user
           />
         </Box>
 
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, bgcolor: '#fafafa', p: 1.5, borderRadius: 2 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2, bgcolor: 'action.hover', p: 1.5, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <BloodtypeIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
             <Typography variant="caption" sx={{ fontWeight: 600 }}>
@@ -100,12 +176,12 @@ export default function RequestCard({ request, onRespond, onRecordDonation, user
           )}
         </Box>
 
-        {onRespond && (
+        {isOwner ? (
           <Button
             fullWidth
             variant="contained"
-            color={isCritical ? 'error' : 'primary'}
-            onClick={() => onRespond(request)}
+            color="secondary"
+            onClick={() => onTrack && onTrack(request.id)}
             sx={{
               borderRadius: 2,
               textTransform: 'none',
@@ -113,7 +189,68 @@ export default function RequestCard({ request, onRespond, onRecordDonation, user
               boxShadow: 'none',
             }}
           >
-            {userRole === 'donor' ? 'Offer Blood Donation' : 'View Matching Donors'}
+            Track Inbound Donors
+          </Button>
+        ) : (
+          onRespond && userRole === 'donor' && (
+            <Box sx={{ mt: 1 }}>
+              {matchStatus !== 'ACCEPTED' ? (
+                <Button
+                  fullWidth
+                  variant="contained"
+                  color={isCritical ? 'error' : 'primary'}
+                  disabled={loading}
+                  onClick={handleOfferClick}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    boxShadow: 'none',
+                  }}
+                >
+                  {loading ? <CircularProgress size={24} color="inherit" /> : 'Offer Blood Donation'}
+                </Button>
+              ) : !isSharing ? (
+                <Button 
+                  color="success" 
+                  fullWidth 
+                  startIcon={<MyLocationIcon />} 
+                  variant="contained"
+                  onClick={handleStartSharing}
+                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, boxShadow: 'none' }}
+                >
+                  Start Sharing Live Location
+                </Button>
+              ) : (
+                <Button 
+                  color="error" 
+                  fullWidth 
+                  startIcon={<StopIcon />} 
+                  variant="outlined"
+                  onClick={handleStopSharing}
+                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+                >
+                  Stop Sharing Location (Live)
+                </Button>
+              )}
+            </Box>
+          )
+        )}
+
+        {!isOwner && onRespond && userRole !== 'donor' && userRole !== 'patient' && (
+          <Button
+            fullWidth
+            variant="contained"
+            color={isCritical ? 'error' : 'primary'}
+            onClick={() => onTrack && onTrack(request.id)}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 700,
+              boxShadow: 'none',
+            }}
+          >
+            View Matching Donors
           </Button>
         )}
 

@@ -20,6 +20,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Sidebar from "../components/Sidebar";
 import RequestCard from "../components/RequestCard";
+import TrackDonorsDialog from "../components/TrackDonorsDialog";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -38,7 +39,7 @@ const BLOOD_COMPATIBILITY = {
 };
 
 function BloodRequests({ role }) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterGroup, setFilterGroup] = useState("");
@@ -47,6 +48,7 @@ function BloodRequests({ role }) {
 
   // Dialog State
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [trackingRequestId, setTrackingRequestId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [alertMsg, setAlertMsg] = useState(null);
   const [formData, setFormData] = useState({
@@ -89,6 +91,7 @@ function BloodRequests({ role }) {
       const newReq = res.data.data?.request || res.data.data;
       setRequests((prev) => [newReq, ...prev]);
       setDialogOpen(false);
+      setTrackingRequestId(newReq.id);
       setAlertMsg({ type: "success", text: "Emergency blood request posted successfully!" });
       setTimeout(() => setAlertMsg(null), 4000);
     } catch (err) {
@@ -101,10 +104,12 @@ function BloodRequests({ role }) {
 
   const handleManualOffer = async (req) => {
     try {
-      await api.post("/matches/manual-offer", { requestId: req.id });
-      setAlertMsg({ type: "success", text: "Thank you for offering to donate! You can track this in your Donor Dashboard." });
+      const res = await api.post("/matches/manual-offer", { requestId: req.id });
+      setAlertMsg({ type: "success", text: "Thank you for offering to donate! You can start sharing your live location." });
+      return res.data.data.id;
     } catch (err) {
       setAlertMsg({ type: "error", text: err.response?.data?.message || "Failed to offer blood." });
+      throw err;
     }
   };
 
@@ -121,7 +126,7 @@ function BloodRequests({ role }) {
   });
 
   return (
-    <Box sx={{ display: "flex", background: "#F6F7FB", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", background: (theme) => theme.palette.background.default, minHeight: "100vh" }}>
       <Sidebar role={role} />
 
       <Box
@@ -242,6 +247,8 @@ function BloodRequests({ role }) {
                   <RequestCard 
                     request={req} 
                     userRole={normalizedRole} 
+                    isOwner={req.requesterUserId === user?.id}
+                    onTrack={setTrackingRequestId}
                     onRespond={canDonate || normalizedRole !== 'donor' ? handleManualOffer : undefined} 
                   />
                 </Grid>
@@ -360,6 +367,14 @@ function BloodRequests({ role }) {
             </DialogActions>
           </form>
         </Dialog>
+        
+        {trackingRequestId && (
+          <TrackDonorsDialog
+            open={Boolean(trackingRequestId)}
+            onClose={() => setTrackingRequestId(null)}
+            requestId={trackingRequestId}
+          />
+        )}
       </Box>
     </Box>
   );

@@ -123,6 +123,7 @@ const getAllRequests = async (req, res, next) => {
                 br.patient_name AS "patientName",
                 br.contact_phone AS "contactPhone",
                 br.notes,
+                br.requester_user_id AS "requesterUserId",
                 br.created_at AS "createdAt",
                 ST_Y(br.geom) AS latitude,
                 ST_X(br.geom) AS longitude

@@ -1,7 +1,8 @@
 const db = require('../config/db');
 const { NOTIFICATION_TYPE } = require('../constants/statuses');
 const twilioService = require('./twilioService');
-const firebaseAdmin = require('../config/firebase');
+const firebaseApp = require('../config/firebase');
+const { getMessaging } = require('firebase-admin/messaging');
 class NotificationService {
     /**
      * Store in-app notification in PostgreSQL
@@ -62,12 +63,12 @@ class NotificationService {
      * Helper: Fetch user FCM token and send push notification
      */
     async sendFcmPushNotification(userId, title, body, payload = {}) {
-        if (!firebaseAdmin || !firebaseAdmin.apps.length) return; // Not configured
+        if (!firebaseApp) return; // Not configured
 
         try {
             const res = await db.query('SELECT fcm_token FROM users WHERE id = $1', [userId]);
             if (res.rows.length && res.rows[0].fcm_token) {
-                await firebaseAdmin.messaging().send({
+                await getMessaging(firebaseApp).send({
                     token: res.rows[0].fcm_token,
                     notification: {
                         title,

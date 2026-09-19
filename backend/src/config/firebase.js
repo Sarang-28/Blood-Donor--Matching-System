@@ -1,13 +1,15 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
 const env = require('./env');
+
+let app = null;
 
 if (env.firebase.projectId && env.firebase.clientEmail && env.firebase.privateKey) {
     try {
-        admin.initializeApp({
-            credential: admin.credential.cert({
+        app = initializeApp({
+            credential: cert({
                 projectId: env.firebase.projectId,
                 clientEmail: env.firebase.clientEmail,
-                privateKey: env.firebase.privateKey,
+                privateKey: env.firebase.privateKey.replace(/\\n/g, '\n'),
             }),
         });
         console.log('Firebase Admin SDK initialized successfully.');
@@ -18,4 +20,4 @@ if (env.firebase.projectId && env.firebase.clientEmail && env.firebase.privateKe
     console.log('Firebase Admin SDK not initialized: Missing credentials in environment.');
 }
 
-module.exports = admin;
+module.exports = app;
