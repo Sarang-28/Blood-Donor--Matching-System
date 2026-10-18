@@ -1,43 +1,7 @@
-/**
- * Geolocation & PostGIS Spatial Utilities
- */
-
-const DEFAULT_COORDINATES = {
-    latitude: 18.5204,  // Default: Pune, Maharashtra
-    longitude: 73.8567,
-};
-
-/**
- * Validate latitude and longitude values
- */
-const isValidCoordinates = (lat, lng) => {
-    const parsedLat = parseFloat(lat);
-    const parsedLng = parseFloat(lng);
-    return (
-        !isNaN(parsedLat) &&
-        !isNaN(parsedLng) &&
-        parsedLat >= -90 &&
-        parsedLat <= 90 &&
-        parsedLng >= -180 &&
-        parsedLng <= 180
-    );
-};
-
-/**
- * Resolve coordinates, using default fallback if not explicitly provided
- */
+const isValidCoordinates = (lat, lng) => [lat, lng].every(v => v !== null && v !== undefined && v !== '' && ['string', 'number'].includes(typeof v) && Number.isFinite(Number(v)))
+    && Number(lat) >= -90 && Number(lat) <= 90 && Number(lng) >= -180 && Number(lng) <= 180;
 const resolveCoordinates = (lat, lng) => {
-    if (isValidCoordinates(lat, lng)) {
-        return {
-            latitude: parseFloat(lat),
-            longitude: parseFloat(lng),
-        };
-    }
-    return DEFAULT_COORDINATES;
+    if (!isValidCoordinates(lat, lng)) throw Object.assign(new Error('Select a location on the map or supply valid coordinates.'), { statusCode: 400 });
+    return { latitude: Number(lat), longitude: Number(lng) };
 };
-
-module.exports = {
-    DEFAULT_COORDINATES,
-    isValidCoordinates,
-    resolveCoordinates,
-};
+module.exports = { isValidCoordinates, resolveCoordinates };

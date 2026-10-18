@@ -1,3 +1,5 @@
+import AdminSettings from '../components/AdminSettings';
+import AdminReports from '../components/AdminReports';
 import { useState, useEffect, useCallback } from "react";
 import {
   Box,
@@ -540,128 +542,9 @@ function AdminDashboard() {
         )}
 
         {/* 4. REPORTS VIEW */}
-        {view === "reports" && (
-          <Grid container spacing={3}>
-            <Grid size={{ xs: 12 }}>
-              <Paper sx={{ p: 3, borderRadius: 3, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-                <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-                  Platform Health & Analytics Summary
-                </Typography>
-                <Divider sx={{ mb: 3 }} />
+        {view === "reports" && <AdminReports/>}
 
-                <Grid container spacing={3}>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <Box sx={{ p: 2, bgcolor: "#E3F2FD", borderRadius: 2, textAlign: "center" }}>
-                      <Typography variant="h4" fontWeight="bold" color="#1976D2">
-                        {summary.totalUsers}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                        Total Accounts
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <Box sx={{ p: 2, bgcolor: "#FFEBEE", borderRadius: 2, textAlign: "center" }}>
-                      <Typography variant="h4" fontWeight="bold" color="#E5384D">
-                        {summary.registeredDonors}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                        Active Donors
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <Box sx={{ p: 2, bgcolor: "#E8F5E9", borderRadius: 2, textAlign: "center" }}>
-                      <Typography variant="h4" fontWeight="bold" color="#2E7D32">
-                        {summary.hospitals}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                        Verified Hospitals
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <Box sx={{ p: 2, bgcolor: "#FFF3E0", borderRadius: 2, textAlign: "center" }}>
-                      <Typography variant="h4" fontWeight="bold" color="#F57C00">
-                        {summary.activeRequests}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                        Pending Requests
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                <Box sx={{ mt: 4 }}>
-                  <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
-                    System Architecture Metrics
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    • <strong>Geospatial Matching Engine:</strong> PostgreSQL PostGIS (ST_DWithin, ST_DistanceSphere) active with GiST spatial indexing.
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    • <strong>Authentication:</strong> JSON Web Tokens (HS256) with role-based multi-profile authorization.
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    • <strong>Real-Time Alerts:</strong> Multi-channel dispatch via WebSockets, Firebase Cloud Messaging, and Twilio SMS.
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-          </Grid>
-        )}
-
-        {/* 5. SETTINGS VIEW */}
-        {view === "settings" && (
-          <Paper sx={{ p: 3, borderRadius: 3, boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-              System Configuration & Security
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-
-            <Grid container spacing={3}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Box sx={{ p: 2.5, border: "1px solid rgba(0,0,0,0.08)", borderRadius: 2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
-                    <SecurityIcon color="primary" />
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      Administrator Credential Policy
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Active Super Admin: <strong>admin@bloodmatch.org</strong>
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    Security Level: Full Platform Management & Institutional Verification Authority
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    Token Validity: 7 Days (Rotating Bearer Signature)
-                  </Typography>
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 6 }}>
-                <Box sx={{ p: 2.5, border: "1px solid rgba(0,0,0,0.08)", borderRadius: 2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
-                    <StorageIcon color="success" />
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      Database & Infrastructure
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Backend API: <code>{api.defaults.baseURL || '/api'}</code>
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    Spatial Engine: PostgreSQL + PostGIS (v3.3)
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    Connection Pool: Keepalive active (25s connect timeout, 60s idle)
-                  </Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-        )}
+        {view === "settings" && <AdminSettings/>}
 
         {/* 6. DEFAULT OVERVIEW DASHBOARD */}
         {view === "dashboard" && (

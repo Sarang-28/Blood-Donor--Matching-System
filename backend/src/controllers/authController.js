@@ -4,6 +4,7 @@ try {
 } catch (e) {
     bcrypt = require('bcryptjs');
 }
+const { validPassword, fail } = require('../utils/security');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const env = require('../config/env');
@@ -19,6 +20,7 @@ const generateToken = (user, availableRoles = []) => {
     return jwt.sign(
         {
             userId: user.id,
+            version: user.token_version || 0,
             email: user.email,
             role: user.role,
             roles,
@@ -32,11 +34,12 @@ const generateToken = (user, availableRoles = []) => {
  * Fetch all registered profiles and active roles for a user
  */
 const getUserProfilesAndRoles = async (userId, primaryRole) => {
-    const [donorRes, patientRes, hospitalRes, bbRes] = await Promise.all([
+    const [donorRes, patientRes, hospitalRes, bbRes, ngoRes] = await Promise.all([
         db.query('SELECT * FROM donors WHERE user_id = $1', [userId]),
         db.query('SELECT * FROM patients WHERE user_id = $1', [userId]),
         db.query('SELECT * FROM hospitals WHERE user_id = $1', [userId]),
         db.query('SELECT * FROM blood_banks WHERE user_id = $1', [userId]),
+        db.query('SELECT * FROM ngos WHERE user_id = $1', [userId]),
     ]);
 
     const availableRoles = [];
@@ -58,6 +61,7 @@ const getUserProfilesAndRoles = async (userId, primaryRole) => {
         availableRoles.push('blood_bank');
         profiles.blood_bank = bbRes.rows[0];
     }
+    if (ngoRes.rowCount) { availableRoles.push('ngo'); profiles.ngo = ngoRes.rows[0]; }
     if (primaryRole === 'admin') {
         availableRoles.push('admin');
     }
@@ -115,16 +119,22 @@ const register = async (req, res, next) => {
             longitude,
         } = req.body;
 
-        const effectiveRole = (role === 'ngo' || role === ROLES.NGO) ? ROLES.BLOOD_BANK : role;
+        if (!['donor','patient','hospital','blood_bank','ngo'].includes(role)) throw fail('Invalid registration role.');
+        if (role === 'donor' && (!bloodGroup || !Number.isInteger(Number(age)) || Number(age) < 18 || Number(age) > 65 || !Number.isFinite(Number(weightKg)) || Number(weightKg) < 45)) throw fail('Provide blood group, age (18–65) and weight (at least 45 kg).');
+        if (role === 'hospital' && !hospitalRegistrationNumber) throw fail('Hospital registration number is required.');
+        if (['blood_bank','ngo'].includes(role) && !licenseNumber && !ngoRegistrationNumber) throw fail('Institution registration number is required.');
+        const effectiveRole = role;
 
         // Check if caller is authenticated with a valid token
         let tokenUserId = null;
+        let tokenVersion = null;
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
             try {
                 const bearerToken = authHeader.split(' ')[1];
-                const decoded = jwt.verify(bearerToken, env.jwt.secret);
+                const decoded = jwt.verify(bearerToken, env.jwt.secret, { algorithms: ['HS256'] });
                 tokenUserId = decoded.userId;
+                tokenVersion = decoded.version || 0;
             } catch (err) {
                 // Token invalid or expired, continue as guest
             }
@@ -141,7 +151,8 @@ const register = async (req, res, next) => {
 
         if (existingCheck.rows.length > 0) {
             const existingUser = existingCheck.rows[0];
-            const isSelfAuthenticated = Boolean(tokenUserId && tokenUserId === existingUser.id);
+            if (!existingUser.is_active) return apiError(res, 'Account unavailable.', 403);
+            const isSelfAuthenticated = Boolean(tokenUserId && tokenUserId === existingUser.id && tokenVersion === existingUser.token_version);
             let isPasswordMatch = false;
 
             if (password) {
@@ -162,7 +173,8 @@ const register = async (req, res, next) => {
             if (effectiveRole === ROLES.DONOR) tableToCheck = 'donors';
             else if (effectiveRole === ROLES.PATIENT) tableToCheck = 'patients';
             else if (effectiveRole === ROLES.HOSPITAL) tableToCheck = 'hospitals';
-            else if (effectiveRole === ROLES.BLOOD_BANK || effectiveRole === 'ngo') tableToCheck = 'blood_banks';
+            else if (effectiveRole === ROLES.BLOOD_BANK) tableToCheck = 'blood_banks';
+            else if (effectiveRole === 'ngo') tableToCheck = 'ngos';
 
             if (tableToCheck) {
                 const roleExists = await client.query(
@@ -185,11 +197,13 @@ const register = async (req, res, next) => {
                 return apiError(res, 'Password is required to create a new account.', 400);
             }
 
+            if (!validPassword(password)) throw fail('Use a password of at least 12 characters and at most 72 UTF-8 bytes.');
+            await client.query('BEGIN');
             // Hash password securely with bcrypt (10 rounds)
-            const salt = await bcrypt.genSalt(10);
+            const salt = await bcrypt.genSalt(12);
             const passwordHash = await bcrypt.hash(password, salt);
 
-            const dbRole = (effectiveRole === 'ngo') ? ROLES.BLOOD_BANK : effectiveRole;
+            const dbRole = effectiveRole;
 
             // Insert into users table
             const userInsert = await client.query(
@@ -205,7 +219,7 @@ const register = async (req, res, next) => {
         const coords = resolveCoordinates(latitude, longitude);
         const locationName = location || hospitalAddress || ngoAddress || patientAddress || 'Pune, Maharashtra';
 
-        await client.query('BEGIN');
+        if (isExistingUser) await client.query('BEGIN');
 
         let profileData = {};
 
@@ -215,24 +229,25 @@ const register = async (req, res, next) => {
             const donorInsert = await client.query(
                 `INSERT INTO donors (
                     user_id, full_name, blood_group, age, weight_kg,
-                    location_name, geom, last_donation_date
+                    location_name, geom, last_donation_date, location_consent
                 )
                 VALUES (
                     $1, $2, $3, $4, $5, $6,
                     ST_SetSRID(ST_MakePoint($7, $8), 4326),
-                    $9
+                    $9, $10
                 )
                 RETURNING id, full_name, blood_group, age, weight_kg, location_name, availability_status, last_donation_date;`,
                 [
                     targetUser.id,
                     donorName,
                     bloodGroup || 'O+',
-                    age ? parseInt(age, 10) : 25,
-                    weightKg ? parseFloat(weightKg) : 65.0,
+                    age ? parseInt(age, 10) : null,
+                    weightKg ? parseFloat(weightKg) : null,
                     locationName,
                     coords.longitude,
                     coords.latitude,
                     lastDonationDate || null,
+                    req.body.locationConsent === true,
                 ]
             );
             profileData = donorInsert.rows[0];
@@ -288,7 +303,11 @@ const register = async (req, res, next) => {
                 ]
             );
             profileData = patientInsert.rows[0];
-        } else if (effectiveRole === ROLES.BLOOD_BANK || effectiveRole === 'ngo') {
+        } else if (effectiveRole === 'ngo') {
+            const n = await client.query(`INSERT INTO ngos(user_id,ngo_name,registration_number,coordinator_name,contact_number,address,service_area,geom)
+                VALUES($1,$2,$3,$4,$5,$6,$7,ST_SetSRID(ST_MakePoint($8,$9),4326)) RETURNING *`,[targetUser.id,organizationName||fullName,ngoRegistrationNumber||licenseNumber,coordinatorName||directorName||fullName,phone,ngoAddress||bloodBankAddress||locationName,areasOfOperation||'',coords.longitude,coords.latitude]);
+            profileData = n.rows[0];
+        } else if (effectiveRole === ROLES.BLOOD_BANK) {
             const name = bloodBankName || organizationName || fullName || 'Regional Blood Bank';
             const licenseNo = licenseNumber || ngoRegistrationNumber || `BB-${Date.now()}`;
             const director = directorName || coordinatorName || 'Director';
@@ -430,17 +449,7 @@ const adminLogin = async (req, res, next) => {
             return apiError(res, 'Please provide username/email and password.', 400);
         }
 
-        // Allow login by email or 'admin' fallback match
-        const queryText = identifier.includes('@')
-            ? 'SELECT * FROM users WHERE email = $1 AND role = $2'
-            : 'SELECT * FROM users WHERE (email = $1 OR email LIKE $3) AND role = $2';
-
-        const userRes = await db.query(
-            queryText,
-            identifier.includes('@')
-                ? [identifier, ROLES.ADMIN]
-                : [identifier, ROLES.ADMIN, 'admin%']
-        );
+        const userRes = await db.query('SELECT * FROM users WHERE email = $1 AND role = $2 AND is_active = TRUE', [identifier, ROLES.ADMIN]);
 
         if (userRes.rows.length === 0) {
             return apiError(res, 'Unauthorized: Invalid Admin credentials.', 401);
@@ -504,8 +513,23 @@ const getMe = async (req, res, next) => {
 /**
  * Logout
  */
-const logout = async (req, res) => {
-    return apiSuccess(res, null, 'Logged out successfully.');
+const logout = async (req, res, next) => {
+    try {
+        await db.query('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [req.user.id]);
+        return apiSuccess(res, null, 'All sessions signed out.');
+    } catch (error) { next(error); }
+};
+const changePassword = async (req, res, next) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!validPassword(newPassword) || typeof currentPassword !== 'string') throw fail('Provide your current password and a new password of 12 characters or more (maximum 72 UTF-8 bytes).');
+        const result = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+        if (!await bcrypt.compare(currentPassword, result.rows[0].password_hash)) throw fail('Current password is incorrect.', 403);
+        const hash = await bcrypt.hash(newPassword, 12);
+        const updated = await db.query('UPDATE users SET password_hash = $1, token_version = token_version + 1, updated_at = NOW() WHERE id = $2 AND password_hash = $3 RETURNING id', [hash, req.user.id, result.rows[0].password_hash]);
+        if (!updated.rowCount) throw fail('Account changed. Please sign in again.', 409);
+        return apiSuccess(res, null, 'Password changed. Sign in again on all devices.');
+    } catch (error) { next(error); }
 };
 
 /**
@@ -515,7 +539,7 @@ const updateFcmToken = async (req, res, next) => {
     try {
         const { fcmToken } = req.body;
         const userId = req.user.id;
-        
+
         await db.query(
             'UPDATE users SET fcm_token = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [fcmToken, userId]
@@ -533,6 +557,7 @@ module.exports = {
     adminLogin,
     getMe,
     logout,
+    changePassword,
     updateFcmToken,
     getUserProfilesAndRoles,
 };

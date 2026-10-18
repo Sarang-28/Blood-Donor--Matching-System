@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography, Button, CircularProgress, Alert } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import StopIcon from '@mui/icons-material/Stop';
@@ -8,14 +8,15 @@ const LiveLocationBroadcaster = ({ matchId }) => {
   const socket = useSocket();
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [error, setError] = useState(null);
-  const [watchId, setWatchId] = useState(null);
+  const watchId = useRef(null);
 
   useEffect(() => {
     // Cleanup on unmount
     return () => {
-      stopBroadcasting();
+      if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
+      socket?.emit('leave_tracking_room', {matchId});
     };
-  }, []);
+  }, [socket, matchId]);
 
   const startBroadcasting = () => {
     if (!navigator.geolocation) {
@@ -23,7 +24,7 @@ const LiveLocationBroadcaster = ({ matchId }) => {
       return;
     }
 
-    if (!socket) {
+    if (!socket?.connected) {
       setError('Connection error. Please try again later.');
       return;
     }
@@ -32,7 +33,7 @@ const LiveLocationBroadcaster = ({ matchId }) => {
     setError(null);
 
     // Join the tracking room as donor
-    socket.emit('join_tracking_room', { matchId, role: 'donor' });
+    socket.emit('join_tracking_room', { matchId }, (result) => { if (!result?.success) { setError('Tracking is not authorized for this match.'); stopBroadcasting(); } });
 
     // Watch position
     const id = navigator.geolocation.watchPosition(
@@ -48,14 +49,14 @@ const LiveLocationBroadcaster = ({ matchId }) => {
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
     );
 
-    setWatchId(id);
+    watchId.current = id;
   };
 
   const stopBroadcasting = () => {
     setIsBroadcasting(false);
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
+    if (watchId.current !== null) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
     }
     if (socket) {
       socket.emit('leave_tracking_room', { matchId });
@@ -70,13 +71,13 @@ const LiveLocationBroadcaster = ({ matchId }) => {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Share your live location so the hospital can prepare for your arrival.
       </Typography>
-      
+
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {!isBroadcasting ? (
-        <Button 
-          variant="contained" 
-          color="primary" 
+        <Button
+          variant="contained"
+          color="primary"
           startIcon={<LocationOnIcon />}
           onClick={startBroadcasting}
           fullWidth
@@ -88,9 +89,9 @@ const LiveLocationBroadcaster = ({ matchId }) => {
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <Typography variant="body1" color="success.main" sx={{ fontWeight: 'bold' }}>📍 Live tracking active</Typography>
           </Box>
-          <Button 
-            variant="outlined" 
-            color="error" 
+          <Button
+            variant="outlined"
+            color="error"
             startIcon={<StopIcon />}
             onClick={stopBroadcasting}
             fullWidth

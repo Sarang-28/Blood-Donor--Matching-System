@@ -14,7 +14,7 @@ const authenticateToken = async (req, res, next) => {
 
         let decoded;
         try {
-            decoded = jwt.verify(token, env.jwt.secret);
+            decoded = jwt.verify(token, env.jwt.secret, { algorithms: ['HS256'] });
         } catch (jwtErr) {
             if (jwtErr.name === 'TokenExpiredError') {
                 return apiError(res, 'Session expired. Please log in again.', 401);
@@ -24,7 +24,7 @@ const authenticateToken = async (req, res, next) => {
 
         // Verify user exists and is active in DB
         const userQuery = await db.query(
-            'SELECT id, email, role, phone, is_active FROM users WHERE id = $1',
+            'SELECT id, email, role, phone, is_active, token_version FROM users WHERE id = $1',
             [decoded.userId]
         );
 
@@ -33,6 +33,7 @@ const authenticateToken = async (req, res, next) => {
         }
 
         const user = userQuery.rows[0];
+        if ((decoded.version || 0) !== user.token_version) return apiError(res, 'Session revoked. Please log in again.', 401);
         if (!user.is_active) {
             return apiError(res, 'Account is suspended or deactivated. Contact administrator.', 403);
         }
@@ -50,10 +51,11 @@ const authenticateToken = async (req, res, next) => {
         if (donorCheck.rows.length > 0) userRoles.push('donor');
         if (patientCheck.rows.length > 0) userRoles.push('patient');
         if (hospitalCheck.rows.length > 0) userRoles.push('hospital');
-        if (bbCheck.rows.length > 0 || ngoCheck.rows.length > 0) {
+        if (bbCheck.rows.length > 0) {
             userRoles.push('blood_bank');
-            userRoles.push('ngo');
+
         }
+        if (ngoCheck.rowCount) userRoles.push('ngo');
         if (user.role === 'admin') userRoles.push('admin');
 
         user.roles = Array.from(new Set(userRoles));

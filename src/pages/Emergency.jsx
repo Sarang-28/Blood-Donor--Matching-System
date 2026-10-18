@@ -1,3 +1,5 @@
+import HospitalPicker from '../components/HospitalPicker';
+import LocationPicker from '../components/LocationPicker';
 import React, { useState } from 'react';
 import {
   Box,
@@ -57,7 +59,7 @@ export default function Emergency() {
       const res = await api.post('/blood-requests', formData);
       setResult({
         type: 'success',
-        text: `Emergency broadcast active! Hyperlocal matching identified donors in the vicinity.`,
+        text: `Request created. ${res.data.data.matchedDonorsCount} compatible donors identified; delivery is not guaranteed.`,
       });
     } catch (err) {
       setResult({
@@ -89,14 +91,14 @@ export default function Emergency() {
                   Critical SOS Blood Request
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Trigger instant SMS and push notifications to all compatible donors within 30km.
+                  Find compatible nearby donors. External alerts depend on consent and configured providers.
                 </Typography>
               </Box>
             </Box>
 
             {result && (
-              <Alert 
-                severity={result.type} 
+              <Alert
+                severity={result.type}
                 sx={{ mb: 3, borderRadius: 2 }}
                 action={result.action}
               >
@@ -106,8 +108,8 @@ export default function Emergency() {
 
             {/* If user is not logged in, they can still see the form but can't submit without a warning, or we can just warn them above. */}
             {!user && !result && (
-              <Alert 
-                severity="warning" 
+              <Alert
+                severity="warning"
                 sx={{ mb: 3, borderRadius: 2 }}
                 action={
                   <Button color="inherit" size="small" component={Link} to="/login">
@@ -119,7 +121,8 @@ export default function Emergency() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <Alert severity="warning" sx={{mb:2}}>Contact a hospital or local emergency service immediately. Do not delay treatment while waiting for donors. Compatibility requires clinical testing.</Alert><form onSubmit={handleSubmit}>
+              <HospitalPicker value={formData} onChange={setFormData}/><LocationPicker value={formData} onChange={setFormData}/>
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField

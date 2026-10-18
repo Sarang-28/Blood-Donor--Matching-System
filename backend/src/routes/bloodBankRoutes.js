@@ -9,7 +9,7 @@ const { ROLES } = require('../constants/roles');
 router.get('/', bloodBankController.getBloodBanksList);
 
 // Public/authenticated view of a blood bank's inventory
-router.get('/:id/inventory', bloodBankController.getInventory);
+router.get('/:id/inventory', (req, res, next) => req.params.id === 'me' ? next('route') : bloodBankController.getInventory(req, res, next));
 
 // Blood Bank authenticated routes
 router.use(authenticateToken);

@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import api from '../services/api';
+import compatibility from '../../shared/bloodCompatibility.json';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Container,
@@ -32,110 +34,17 @@ import LoginIcon from "@mui/icons-material/Login";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import ArrowRightAltIcon from "@mui/icons-material/ArrowRightAlt";
 
-// Blood Compatibility Matrix
-const BLOOD_COMPATIBILITY = {
-  "O-": {
-    give: ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"],
-    receive: ["O-"],
-    rarity: "Universal Red Cell Donor • 7% of population",
-    urgent: true,
-    tag: "Highest Emergency Demand",
-    fillPercent: 88,
-  },
-  "O+": {
-    give: ["O+", "A+", "B+", "AB+"],
-    receive: ["O-", "O+"],
-    rarity: "Most Common Blood Type • 37% of population",
-    urgent: false,
-    tag: "High Volume Utility",
-    fillPercent: 70,
-  },
-  "A-": {
-    give: ["A-", "A+", "AB-", "AB+"],
-    receive: ["O-", "A-"],
-    rarity: "Rare Type • 6% of population",
-    urgent: true,
-    tag: "Critical for Platelet Units",
-    fillPercent: 82,
-  },
-  "A+": {
-    give: ["A+", "AB+"],
-    receive: ["O-", "O+", "A-", "A+"],
-    rarity: "Second Most Common • 34% of population",
-    urgent: false,
-    tag: "High Clinical Need",
-    fillPercent: 65,
-  },
-  "B-": {
-    give: ["B-", "B+", "AB-", "AB+"],
-    receive: ["O-", "B-"],
-    rarity: "Very Rare • 2% of population",
-    urgent: true,
-    tag: "Extremely Scarce Inventory",
-    fillPercent: 92,
-  },
-  "B+": {
-    give: ["B+", "AB+"],
-    receive: ["O-", "O+", "B-", "B+"],
-    rarity: "Frequent Need • 9% of population",
-    urgent: false,
-    tag: "Essential Trauma Stock",
-    fillPercent: 75,
-  },
-  "AB-": {
-    give: ["AB-", "AB+"],
-    receive: ["O-", "A-", "B-", "AB-"],
-    rarity: "Rarest Blood Type • <1% of population",
-    urgent: true,
-    tag: "Universal Plasma Donor",
-    fillPercent: 95,
-  },
-  "AB+": {
-    give: ["AB+"],
-    receive: ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"],
-    rarity: "Universal Recipient • 4% of population",
-    urgent: false,
-    tag: "Can Receive Any Blood Type",
-    fillPercent: 55,
-  },
-};
-
-const LIVE_FEEDS = [
-  {
-    group: "O-",
-    units: "2 Units Required",
-    hospital: "Apollo Multispecialty Hospital",
-    dist: "1.8 km away",
-    urgency: "Critical",
-    timeAgo: "Requested 2 mins ago",
-  },
-  {
-    group: "B+",
-    units: "3 Units Required",
-    hospital: "Ruby Hall Emergency Clinic",
-    dist: "3.4 km away",
-    urgency: "Urgent",
-    timeAgo: "Requested 5 mins ago",
-  },
-  {
-    group: "A-",
-    units: "1 Unit Required",
-    hospital: "Sancheti Orthopedic Trauma",
-    dist: "2.1 km away",
-    urgency: "Critical",
-    timeAgo: "Requested 9 mins ago",
-  },
-  {
-    group: "O+",
-    units: "4 Units Required",
-    hospital: "KEM Hospital Blood Bank",
-    dist: "4.2 km away",
-    urgency: "Active",
-    timeAgo: "Requested 14 mins ago",
-  },
-];
+const BLOOD_COMPATIBILITY = Object.fromEntries(Object.entries(compatibility).map(([group,receive])=>[group,{
+ receive,give:Object.keys(compatibility).filter(recipient=>compatibility[recipient].includes(group)),
+ rarity:'Red blood cell compatibility only. Final eligibility and crossmatching require clinical testing.',
+ tag:group==='O-'?'Universal red cell donor':group==='AB+'?'Universal red cell recipient':'Preliminary compatibility',
+ urgent:false,fillPercent:60
+}]));
 
 function Landing() {
+  const [summary,setSummary]=useState(null);
+  const [feedError,setFeedError]=useState('');
+  useEffect(()=>{const load=()=>api.get('/public/summary').then(r=>{setSummary(r.data.data);setFeedError('');}).catch(()=>setFeedError('Live data is currently unavailable.'));load();const timer=setInterval(load,60000);return()=>clearInterval(timer);},[]);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [selectedBlood, setSelectedBlood] = useState("B+");
@@ -421,8 +330,8 @@ function Landing() {
                     mb: 4,
                   }}
                 >
-                  Connecting emergency trauma centers with verified nearby blood donors, patients, and certified blood banks
-                  in real-time within a <strong>10km hyperlocal radius</strong>.
+                  Connecting hospitals with registered nearby blood donors, patients, and blood banks
+                  within a <strong>configurable local radius</strong>.
                 </Typography>
 
                 {/* CTA Buttons */}
@@ -483,27 +392,27 @@ function Landing() {
                   <Grid size={{ xs: 6, sm: 4 }}>
                     <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
                       <Typography variant="h5" fontWeight={800} color="#FF6B81">
-                        3.4 min
+                        {summary?.donors ?? "—"}
                       </Typography>
                       <Typography variant="caption" color="rgba(255,255,255,0.65)">
-                        Average Match Time
+                        Registered Donors
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 4 }}>
                     <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
                       <Typography variant="h5" fontWeight={800} color="#4ADE80">
-                        99.4%
+                        {summary?.fulfilled ?? "—"}
                       </Typography>
                       <Typography variant="caption" color="rgba(255,255,255,0.65)">
-                        Fulfillment Rate
+                        Fulfilled Requests
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid size={{ xs: 12, sm: 4 }}>
                     <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
                       <Typography variant="h5" fontWeight={800} color="#60A5FA">
-                        10 km
+                        {summary?.settings?.radiusKm ?? "—"} km
                       </Typography>
                       <Typography variant="caption" color="rgba(255,255,255,0.65)">
                         Hyperlocal Radius
@@ -608,7 +517,7 @@ function Landing() {
                   </Box>
                   <Box>
                     <Typography variant="caption" sx={{ color: "#fff", fontWeight: 700, display: "block" }}>
-                      Donor Verified (O-)
+                      Illustration: donor (O-)
                     </Typography>
                     <Typography variant="caption" sx={{ color: "#4ADE80", fontSize: "0.65rem" }}>
                       ● 1.2 km • Standby Active
@@ -704,7 +613,7 @@ function Landing() {
               Know Your Match in Seconds
             </Typography>
             <Typography variant="body1" color="#94A3B8" maxWidth={600} mx="auto">
-              Select your blood type to instantly discover your universal donor compatibility, emergency recipient network, and rarity profile.
+              Explore preliminary red blood cell donor and recipient compatibility.
             </Typography>
           </Box>
 
@@ -881,7 +790,7 @@ function Landing() {
                         {activeCompat.rarity}
                       </Typography>
                       <Typography variant="caption" sx={{ color: "#94A3B8", display: "block", mt: 0.5 }}>
-                        Hyperlocal Match Priority: <strong style={{ color: "#4ADE80" }}>Sub-second verified</strong>
+                        Hyperlocal Match Priority: <strong style={{ color: "#4ADE80" }}>Clinical testing required</strong>
                       </Typography>
                     </Box>
                   </Box>
@@ -974,7 +883,7 @@ function Landing() {
           <Box sx={{ textAlign: "center", mb: 9 }}>
             <Chip label="THE HYPERLOCAL ENGINE" color="primary" size="small" sx={{ fontWeight: 800, mb: 1.5 }} />
             <Typography variant="h3" fontWeight={900} sx={{ letterSpacing: "-1px", mb: 2, color: "#FFFFFF" }}>
-              How Lives Are Saved in Under 15 Minutes
+              How BloodMatch Coordinates Requests
             </Typography>
             <Typography variant="body1" sx={{ color: "#94A3B8" }} maxWidth={640} mx="auto">
               Our automated spatial algorithms replace slow, manual phone trees with instant geospatial broadcasts.
@@ -1024,7 +933,7 @@ function Landing() {
                 telemetry: "T+ 0.8s",
                 icon: <LocationOnIcon sx={{ fontSize: 32, color: "#6366F1" }} />,
                 title: "PostGIS Geo-Fencing",
-                desc: "The PostgreSQL engine performs sub-second spatial queries to locate active verified donors within 10 km.",
+                desc: "Nearby matching checks blood group, availability and the configured donation interval.",
               },
               {
                 step: "03",
@@ -1272,7 +1181,7 @@ function Landing() {
                   }}
                 />
                 <Typography variant="caption" sx={{ color: "#4ADE80", fontWeight: 800, letterSpacing: 0.5 }}>
-                  14 REQUESTS LIVE NOW • WEBSOCKET ACTIVE
+                  {feedError || `${summary?.active ?? "—"} ACTIVE REQUESTS • REFRESHES EVERY MINUTE`}
                 </Typography>
               </Box>
               <Typography variant="h4" fontWeight={900} sx={{ color: "#FFFFFF" }}>
@@ -1300,7 +1209,7 @@ function Landing() {
           </Box>
 
           <Grid container spacing={3}>
-            {LIVE_FEEDS.map((feed, idx) => (
+            {(summary?.requests || []).map((feed, idx) => (
               <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={idx}>
                 <Paper
                   sx={{
@@ -1330,7 +1239,7 @@ function Landing() {
                   </Box>
 
                   <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#FFFFFF", mb: 1 }}>
-                    {feed.units}
+                    {feed.units} unit(s) required
                   </Typography>
 
                   {/* Prominent Hospital & Distance Pill Styling */}
@@ -1347,13 +1256,13 @@ function Landing() {
                       🏥 {feed.hospital}
                     </Typography>
                     <Typography variant="caption" sx={{ color: "#60A5FA", fontWeight: 700, mt: 0.5, display: "block" }}>
-                      📍 {feed.dist} • Hyperlocal Radar
+                      📍 Distance available after authorized matching
                     </Typography>
                   </Box>
 
                   {/* Dynamic Micro-Tag */}
                   <Typography variant="caption" sx={{ color: "#94A3B8", display: "block" }}>
-                    ⏱️ {feed.timeAgo}
+                    ⏱️ Current hospital request
                   </Typography>
                 </Paper>
               </Grid>
@@ -1398,7 +1307,7 @@ function Landing() {
                     Years Age Limit
                   </Typography>
                   <Typography variant="caption" sx={{ color: "#94A3B8", display: "block", mt: 0.5 }}>
-                    Verified via Government Photo ID.
+                    Self-reported age; hospital screening required.
                   </Typography>
                 </Box>
               </Grid>
@@ -1412,7 +1321,7 @@ function Landing() {
                     kg Minimum Weight
                   </Typography>
                   <Typography variant="caption" sx={{ color: "#94A3B8", display: "block", mt: 0.5 }}>
-                    Ensures donor hemodynamic safety.
+                    Preliminary screening only; clinical assessment required.
                   </Typography>
                 </Box>
               </Grid>
@@ -1420,13 +1329,13 @@ function Landing() {
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box sx={{ p: 2.5, borderRadius: 3, bgcolor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   <Typography variant="h4" fontWeight={900} sx={{ color: "#60A5FA", mb: 0.5 }}>
-                    90
+                    {summary?.settings?.cooldownDays ?? "—"}
                   </Typography>
                   <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#FFFFFF" }}>
                     Days Interval
                   </Typography>
                   <Typography variant="caption" sx={{ color: "#94A3B8", display: "block", mt: 0.5 }}>
-                    Full recovery cycle between donations.
+                    Configured interval; follow hospital guidance.
                   </Typography>
                 </Box>
               </Grid>
@@ -1434,13 +1343,13 @@ function Landing() {
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <Box sx={{ p: 2.5, borderRadius: 3, bgcolor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   <Typography variant="h4" fontWeight={900} sx={{ color: "#FBBF24", mb: 0.5 }}>
-                    Zero
+                    Private
                   </Typography>
                   <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#FFFFFF" }}>
-                    GPS Exposure
+                    Saved Location
                   </Typography>
                   <Typography variant="caption" sx={{ color: "#94A3B8", display: "block", mt: 0.5 }}>
-                    Home location is private; meeting at certified facilities only.
+                    Saved coordinates are private. Live sharing requires your explicit action.
                   </Typography>
                 </Box>
               </Grid>
@@ -1567,7 +1476,7 @@ function Landing() {
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{ color: "#94A3B8" }} lineHeight={1.6} maxWidth={320}>
-                Next-generation geospatial blood donor matching network delivering sub-second matches and 24/7 life-saving logistics.
+                Geographic matching helps people coordinate with nearby donors and hospitals.
               </Typography>
             </Grid>
 

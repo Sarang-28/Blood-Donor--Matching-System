@@ -8,7 +8,7 @@ const { apiSuccess, apiError } = require('../utils/apiResponse');
 const getProfile = async (req, res, next) => {
     try {
         const query = `
-            SELECT 
+            SELECT
                 p.id,
                 p.full_name,
                 p.blood_group,
@@ -53,23 +53,23 @@ const updateProfile = async (req, res, next) => {
             longitude,
         } = req.body;
 
-        const coords = (latitude && longitude)
+        const coords = (latitude !== undefined || longitude !== undefined)
             ? resolveCoordinates(latitude, longitude)
             : null;
 
         const updateSql = `
             UPDATE patients
-            SET 
+            SET
                 full_name = COALESCE($1, full_name),
                 blood_group = COALESCE($2, blood_group),
                 medical_condition = COALESCE($3, medical_condition),
                 attending_doctor = COALESCE($4, attending_doctor),
                 address = COALESCE($5, address),
                 emergency_contact = COALESCE($6, emergency_contact),
-                geom = CASE 
-                    WHEN $7::numeric IS NOT NULL AND $8::numeric IS NOT NULL 
+                geom = CASE
+                    WHEN $7::numeric IS NOT NULL AND $8::numeric IS NOT NULL
                     THEN ST_SetSRID(ST_MakePoint($8, $7), 4326)
-                    ELSE geom 
+                    ELSE geom
                 END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE user_id = $9

@@ -5,7 +5,7 @@ const notFoundHandler = (req, res, next) => {
 };
 
 const errorHandler = (err, req, res, next) => {
-    console.error('Unhandled Application Error:', err);
+    console.error('Application error:', {code: err.code || 'application', status: err.statusCode || err.status || 500});
 
     // Specific PostgreSQL error handling
     if (err.code === '23505') { // unique_violation
@@ -18,9 +18,10 @@ const errorHandler = (err, req, res, next) => {
         return apiError(res, 'Invalid format or parameter type provided.', 400);
     }
 
-    const statusCode = err.statusCode || 500;
+    if (['23514', '22003', '22007', '22008'].includes(err.code)) return apiError(res, 'Invalid input values.', 400);
+    const statusCode = err.statusCode || err.status || 500;
     let message = err.message || 'Internal Server Error';
-    if (statusCode === 500 && process.env.NODE_ENV === 'production') {
+    if (statusCode >= 500) {
         message = 'An unexpected error occurred. Please contact system support.';
     }
     return apiError(res, message, statusCode);

@@ -1,3 +1,5 @@
+import {TextField,MenuItem} from '@mui/material';
+import {useAuth} from '../context/AuthContext';
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -15,45 +17,23 @@ import {
 } from '@mui/material';
 import api from '../services/api';
 import LiveTrackerMap from './LiveTrackerMap';
-import { useSocket } from '../context/SocketContext';
 
 export default function TrackDonorsDialog({ open, onClose, requestId }) {
+  const {user}=useAuth();
+  const [ngos,setNgos]=useState([]);
+  const [ngoId,setNgoId]=useState('');
+  const [urgency,setUrgency]=useState('Urgent');
+  useEffect(()=>{if(open)api.get('/ngos').then(r=>setNgos(r.data.data)).catch(()=>{});},[open]);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [reviewing,setReviewing]=useState(null);
+  const [reviewMessage,setReviewMessage]=useState(null);
   const [activeTrackingMatchId, setActiveTrackingMatchId] = useState(null);
 
-  useEffect(() => {
-    if (open && requestId) {
-      fetchMatches();
-    } else {
-      setData(null);
-      setActiveTrackingMatchId(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, requestId]);
-
-  const socket = useSocket();
-
-  useEffect(() => {
-    if (!socket || !open || !requestId) return;
-
-    socket.emit('join_tracking_room', { matchId: requestId, role: 'patient' });
-
-    socket.on('match_accepted', (newMatchData) => {
-      // Re-fetch matches when a donor accepts
-      fetchMatches();
-    });
-
-    return () => {
-      socket.off('match_accepted');
-      socket.emit('leave_tracking_room', { matchId: requestId });
-    };
-  }, [socket, open, requestId]);
-
-  const fetchMatches = async () => {
+  const fetchMatches = async (showLoading = false) => {
     try {
-      setLoading(true);
+      if(showLoading) setLoading(true);
       setError(null);
       const res = await api.get(`/blood-requests/${requestId}`);
       setData(res.data.data);
@@ -64,6 +44,23 @@ export default function TrackDonorsDialog({ open, onClose, requestId }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (open && requestId) {
+      fetchMatches(true);
+    } else {
+      setData(null);
+      setActiveTrackingMatchId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, requestId]);
+
+  useEffect(() => {
+    if (!open || !requestId) return;
+    const timer = setInterval(fetchMatches, 15000);
+    return () => clearInterval(timer);
+  }, [open, requestId]);
+
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -79,6 +76,7 @@ export default function TrackDonorsDialog({ open, onClose, requestId }) {
         Matching Donors & Live Tracking
       </DialogTitle>
       <DialogContent dividers sx={{ bgcolor: '#F6F7FB' }}>
+        {reviewMessage && <Alert severity={reviewMessage.type} sx={{mb:2}}>{reviewMessage.text}</Alert>}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress color="error" />
@@ -87,6 +85,13 @@ export default function TrackDonorsDialog({ open, onClose, requestId }) {
           <Alert severity="error">{error}</Alert>
         ) : data ? (
           <Box>
+            {data.request.requester_user_id === user?.id && ['active','matching'].includes(data.request.status) && <Box sx={{mb:2}}>
+              <TextField select label="Urgency" value={urgency} onChange={e=>setUrgency(e.target.value)}>{['Normal','Urgent','Critical'].map(u=><MenuItem key={u} value={u}>{u}</MenuItem>)}</TextField>
+              <Button onClick={async()=>{try{await api.patch(`/blood-requests/${requestId}`,{urgency});fetchMatches();}catch(e){setError(e.response?.data?.message||'Update failed.');}}}>Update urgency</Button>
+              <Button color="error" onClick={async()=>{try{await api.patch(`/blood-requests/${requestId}/status`,{status:'cancelled'});fetchMatches();}catch(e){setError(e.response?.data?.message||'Cancellation failed.');}}}>Cancel request</Button>
+              <TextField select fullWidth sx={{mt:2}} label="Assign an NGO" value={ngoId} onChange={e=>setNgoId(e.target.value)}><MenuItem value="">Select a verified NGO</MenuItem>{ngos.map(n=><MenuItem key={n.id} value={n.id}>{n.ngo_name}</MenuItem>)}</TextField>
+              <Button disabled={!ngoId} onClick={async()=>{try{await api.post(`/blood-requests/${requestId}/assign-ngo`,{ngoId});setNgoId('');}catch(e){setError(e.response?.data?.message||'Assignment failed.');}}}>Assign coordination</Button>
+            </Box>}
             <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
               Showing {data.matches.length} nearby matched donors
             </Typography>
@@ -107,15 +112,27 @@ export default function TrackDonorsDialog({ open, onClose, requestId }) {
                       )}
                     </Box>
                     <Box sx={{ textAlign: 'right' }}>
-                      <Chip 
-                        label={match.matchStatus.toUpperCase()} 
+                      <Chip
+                        label={match.matchStatus.toUpperCase()}
                         color={getStatusColor(match.matchStatus)}
                         size="small"
                         sx={{ mb: 1, fontWeight: 700 }}
                       />
                       <br/>
-                      {match.matchStatus === 'accepted' && (
-                        <Button 
+                      {match.matchStatus === 'accepted' && <Typography variant="body2">Your decision: {match.requesterDecision}</Typography>}
+                      {match.matchStatus === 'accepted' && match.requesterDecision === 'pending' && data.request.requester_user_id === user?.id && ['active','matching'].includes(data.request.status) && (
+                        <Box sx={{mt:1}}>
+                          <Typography variant="caption" display="block">Approving shares the patient name, request contact number and destination with this donor.</Typography>
+                          {['approved','rejected'].map(decision=><Button key={decision} disabled={Boolean(reviewing)} color={decision==='approved'?'success':'error'} onClick={async()=>{
+                            setReviewing(match.matchId);setReviewMessage(null);
+                            try {const response=await api.patch(`/matches/${match.matchId}/review`,{decision});setReviewMessage({type:'success',text:response.data.message});await fetchMatches();}
+                            catch(e){setReviewMessage({type:'error',text:e.response?.data?.message||'Could not review donor.'});}
+                            finally{setReviewing(null);}
+                          }}>{decision==='approved'?'Approve & share contact':'Reject donor'}</Button>)}
+                        </Box>
+                      )}
+                      {match.matchStatus === 'accepted' && match.requesterDecision === 'approved' && (
+                        <Button
                           variant={activeTrackingMatchId === match.matchId ? 'contained' : 'outlined'}
                           color="primary"
                           size="small"
@@ -132,7 +149,7 @@ export default function TrackDonorsDialog({ open, onClose, requestId }) {
 
                   {activeTrackingMatchId === match.matchId && (
                     <Box sx={{ mt: 2, borderTop: '1px solid #eee', pt: 2 }}>
-                      <LiveTrackerMap matchId={match.matchId} initialCenter={[data.request.latitude, data.request.longitude]} />
+                      <LiveTrackerMap matchId={match.matchId} hospitalLat={data.request.latitude} hospitalLng={data.request.longitude} />
                     </Box>
                   )}
                 </CardContent>

@@ -24,6 +24,8 @@ import AddIcon from "@mui/icons-material/Add";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
+import NgoDashboard from './NgoDashboard';
+import PatientDashboard from './PatientDashboard';
 import DonorDashboard from "./DonorDashboard";
 import HospitalDashboard from "./HospitalDashboard";
 import BloodBankDashboard from "./BloodBankDashboard";
@@ -40,9 +42,12 @@ function Dashboard({ role }) {
     if (role === "hospital") {
         return <HospitalDashboard />;
     }
-    if (role === "blood_bank" || role === "ngo") {
+    if (role === "ngo") return <NgoDashboard/>;
+    if (role === "blood_bank") {
         return <BloodBankDashboard role={role} />;
     }
+
+    if (role === "patient") return <PatientDashboard/>;
 
     const roleData = {
         donor: {

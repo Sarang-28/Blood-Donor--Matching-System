@@ -1,3 +1,6 @@
+import NgoDashboard from './NgoDashboard';
+import AccountSecurity from '../components/AccountSecurity';
+import LocationPicker from '../components/LocationPicker';
 import {
   Box,
   Card,
@@ -24,6 +27,10 @@ import api from "../services/api";
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 function Profile({ role }) {
+  if (role === "ngo") return <NgoDashboard/>;
+  return <AccountProfile role={role}/>;
+}
+function AccountProfile({ role }) {
   const { user, profile, updateProfile } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -89,6 +96,7 @@ function Profile({ role }) {
               bloodBankName: d.blood_bank_name || "",
               directorName: d.director_name || d.coordinator_name || "",
               operatingHours: d.operating_hours || "24/7",
+              latitude: d.latitude, longitude: d.longitude, locationConsent: d.location_consent === true,
               phone: user?.phone || d.phone || d.contact_number || "",
             });
 
@@ -168,6 +176,8 @@ function Profile({ role }) {
 
       if (role === "donor") {
         res = await api.put("/donors/profile", {
+          ...(formData.latitude !== undefined && formData.longitude !== undefined ? {latitude: formData.latitude, longitude: formData.longitude} : {}),
+          locationConsent: formData.locationConsent,
           fullName: formData.fullName,
           bloodGroup: formData.bloodGroup,
           age: formData.age ? parseInt(formData.age, 10) : null,
@@ -177,6 +187,8 @@ function Profile({ role }) {
         });
       } else if (role === "patient") {
         res = await api.put("/patients/profile", {
+          ...(formData.latitude !== undefined && formData.longitude !== undefined ? {latitude: formData.latitude, longitude: formData.longitude} : {}),
+          locationConsent: formData.locationConsent,
           fullName: formData.fullName,
           bloodGroup: formData.bloodGroup,
           medicalCondition: formData.medicalCondition,
@@ -186,6 +198,8 @@ function Profile({ role }) {
         });
       } else if (role === "hospital") {
         res = await api.put("/hospitals/profile", {
+          ...(formData.latitude !== undefined && formData.longitude !== undefined ? {latitude: formData.latitude, longitude: formData.longitude} : {}),
+          locationConsent: formData.locationConsent,
           hospitalName: formData.hospitalName || formData.fullName,
           licenseNumber: formData.licenseNumber,
           speciality: formData.speciality,
@@ -194,6 +208,8 @@ function Profile({ role }) {
         });
       } else if (role === "blood_bank" || role === "ngo") {
         res = await api.put("/blood-banks/profile/me", {
+          ...(formData.latitude !== undefined && formData.longitude !== undefined ? {latitude: formData.latitude, longitude: formData.longitude} : {}),
+          locationConsent: formData.locationConsent,
           bloodBankName: formData.bloodBankName || formData.fullName,
           licenseNumber: formData.licenseNumber,
           directorName: formData.directorName,
@@ -272,6 +288,7 @@ function Profile({ role }) {
           </Alert>
         )}
 
+        <AccountSecurity/>
         <Grid container spacing={3}>
           {/* Avatar & Summary Card */}
           <Grid size={{ xs: 12, md: 4 }}>
@@ -336,6 +353,7 @@ function Profile({ role }) {
               <Divider sx={{ mb: 3 }} />
 
               <Box component="form" onSubmit={handleSave}>
+                <LocationPicker value={formData} onChange={setFormData} donor={role === "donor"}/>
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12 }}>
                     <TextField

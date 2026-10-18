@@ -9,7 +9,7 @@ const { apiSuccess, apiError } = require('../utils/apiResponse');
 const getProfile = async (req, res, next) => {
     try {
         const query = `
-            SELECT 
+            SELECT
                 d.id,
                 d.full_name,
                 d.blood_group,
@@ -19,17 +19,20 @@ const getProfile = async (req, res, next) => {
                 d.availability_status,
                 d.last_donation_date,
                 d.emergency_ready,
+                d.location_consent,
                 d.total_donations,
                 ST_Y(d.geom) AS latitude,
                 ST_X(d.geom) AS longitude,
                 u.email,
                 u.phone,
-                d.created_at
+                d.created_at,
+                (d.last_donation_date IS NULL OR d.last_donation_date <= CURRENT_DATE - $2::integer) AND d.age BETWEEN 18 AND 65 AND d.weight_kg >= 45 AS eligible,
+                d.last_donation_date + $2::integer AS next_eligible_date
             FROM donors d
             JOIN users u ON d.user_id = u.id
             WHERE d.user_id = $1;
         `;
-        const result = await db.query(query, [req.user.id]);
+        const result = await db.query(query, [req.user.id, (await require('../services/settingsService')()).cooldownDays]);
 
         if (result.rows.length === 0) {
             return apiError(res, 'Donor profile not found.', 404);
@@ -78,13 +81,14 @@ const updateProfile = async (req, res, next) => {
             }
         }
 
-        const coords = (latitude && longitude)
+        const coords = (latitude !== undefined || longitude !== undefined)
             ? resolveCoordinates(latitude, longitude)
             : null;
 
         const updateSql = `
             UPDATE donors
-            SET 
+            SET
+                location_consent = COALESCE($11, location_consent),
                 full_name = COALESCE($1, full_name),
                 blood_group = COALESCE($2, blood_group),
                 age = COALESCE($3, age),
@@ -92,10 +96,10 @@ const updateProfile = async (req, res, next) => {
                 location_name = COALESCE($5, location_name),
                 last_donation_date = COALESCE($6, last_donation_date),
                 emergency_ready = COALESCE($7, emergency_ready),
-                geom = CASE 
-                    WHEN $8::numeric IS NOT NULL AND $9::numeric IS NOT NULL 
+                geom = CASE
+                    WHEN $8::numeric IS NOT NULL AND $9::numeric IS NOT NULL
                     THEN ST_SetSRID(ST_MakePoint($9, $8), 4326)
-                    ELSE geom 
+                    ELSE geom
                 END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE user_id = $10
@@ -113,6 +117,7 @@ const updateProfile = async (req, res, next) => {
             coords ? coords.latitude : null,
             coords ? coords.longitude : null,
             req.user.id,
+            typeof req.body.locationConsent === 'boolean' ? req.body.locationConsent : null,
         ];
 
         const result = await db.query(updateSql, values);
@@ -129,28 +134,29 @@ const toggleAvailability = async (req, res, next) => {
     try {
         const { status } = req.body;
         const targetStatus = status || null;
+        if (status && !['Available', 'Unavailable', 'Temporarily Unavailable'].includes(status)) return apiError(res, 'Invalid availability.', 400);
 
         let sql = '';
         let params = [];
 
         if (targetStatus) {
             sql = `
-                UPDATE donors 
-                SET availability_status = $1, updated_at = CURRENT_TIMESTAMP 
-                WHERE user_id = $2 
+                UPDATE donors
+                SET availability_status = $1, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = $2
                 RETURNING id, full_name, availability_status;
             `;
             params = [targetStatus, req.user.id];
         } else {
             // Flip status
             sql = `
-                UPDATE donors 
-                SET availability_status = CASE 
-                    WHEN availability_status = 'Available' THEN 'Unavailable'::availability_type 
-                    ELSE 'Available'::availability_type 
+                UPDATE donors
+                SET availability_status = CASE
+                    WHEN availability_status = 'Available' THEN 'Unavailable'::availability_type
+                    ELSE 'Available'::availability_type
                 END,
                 updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = $1 
+                WHERE user_id = $1
                 RETURNING id, full_name, availability_status;
             `;
             params = [req.user.id];
@@ -173,7 +179,7 @@ const toggleAvailability = async (req, res, next) => {
 const getDonationHistory = async (req, res, next) => {
     try {
         const query = `
-            SELECT 
+            SELECT
                 d.id,
                 d.units_donated,
                 d.donation_date,
@@ -209,16 +215,16 @@ const getNearbyDonors = async (req, res, next) => {
         const {
             lat,
             lng,
-            radiusKm = 25,
+            radiusKm,
             bloodGroup = '',
             search = '',
         } = req.query;
 
         // If coordinates provided, run PostGIS ST_DWithin & ST_Distance query
-        if (lat && lng) {
+        if (lat !== undefined && lng !== undefined) {
             const latitude = parseFloat(lat);
             const longitude = parseFloat(lng);
-            const radiusMeters = parseFloat(radiusKm) * 1000;
+            const radiusMeters = Number(radiusKm || (await require('../services/settingsService')()).radiusKm) * 1000;
 
             const donors = await donorMatchingService.findNearbyCompatibleDonors({
                 latitude,
@@ -229,8 +235,8 @@ const getNearbyDonors = async (req, res, next) => {
 
             // If user also typed a text query, filter in addition
             const filtered = search
-                ? donors.filter(d => 
-                    d.fullName.toLowerCase().includes(search.toLowerCase()) || 
+                ? donors.filter(d =>
+                    d.fullName.toLowerCase().includes(search.toLowerCase()) ||
                     d.locationName.toLowerCase().includes(search.toLowerCase())
                   )
                 : donors;
@@ -245,24 +251,23 @@ const getNearbyDonors = async (req, res, next) => {
                     status: 'Available',
                     distanceKm: d.distanceKm,
                     isExactMatch: d.isExactMatch,
-                    phone: d.phone,
+
                 })),
             });
         }
 
         // Otherwise list donors matching query and blood group
         let sql = `
-            SELECT 
+            SELECT
                 d.id,
                 d.full_name AS name,
                 d.blood_group AS "bloodGroup",
                 d.location_name AS location,
                 d.availability_status AS status,
-                d.total_donations,
-                u.phone
+                d.total_donations
             FROM donors d
             JOIN users u ON d.user_id = u.id
-            WHERE u.is_active = TRUE
+            WHERE u.is_active = TRUE AND d.location_consent = TRUE
         `;
         const values = [];
 
@@ -295,7 +300,7 @@ const getDonorById = async (req, res, next) => {
     try {
         const { id } = req.params;
         const query = `
-            SELECT 
+            SELECT
                 d.id,
                 d.full_name AS name,
                 d.blood_group AS "bloodGroup",

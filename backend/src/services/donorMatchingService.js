@@ -1,3 +1,4 @@
+const { resolveCoordinates } = require('../utils/geoUtils');
 const db = require('../config/db');
 const { getCompatibleDonorGroups } = require('../constants/bloodCompatibility');
 const { MATCH_STATUS, URGENCY_LEVEL } = require('../constants/statuses');
@@ -9,7 +10,7 @@ const notificationService = require('./notificationService');
 class DonorMatchingService {
     /**
      * Find nearby compatible donors using PostGIS spatial queries
-     * 
+     *
      * @param {Object} params
      * @param {number} params.latitude
      * @param {number} params.longitude
@@ -23,22 +24,19 @@ class DonorMatchingService {
         latitude,
         longitude,
         bloodGroup,
-        radiusMeters = 15000,
+        radiusMeters,
         urgency = URGENCY_LEVEL.NORMAL,
         limit = 25,
     }) {
-        // Expand radius automatically for critical emergencies
-        let searchRadius = radiusMeters;
-        if (urgency === URGENCY_LEVEL.CRITICAL) {
-            searchRadius = Math.max(searchRadius, 30000); // at least 30km for critical
-        } else if (urgency === URGENCY_LEVEL.URGENT) {
-            searchRadius = Math.max(searchRadius, 20000); // at least 20km for urgent
-        }
-
+        const policy = await require('./settingsService')();
+        radiusMeters ??= policy.radiusKm * 1000;
+        resolveCoordinates(latitude, longitude);
+        if (!Number.isFinite(Number(radiusMeters)) || radiusMeters < 1000 || radiusMeters > 100000) throw Object.assign(new Error('Radius must be between 1 and 100 km.'), { statusCode: 400 });
+        const searchRadius = radiusMeters;
         const compatibleGroups = getCompatibleDonorGroups(bloodGroup);
 
         const sql = `
-            SELECT 
+            SELECT
                 d.id AS donor_id,
                 d.user_id,
                 d.full_name,
@@ -52,17 +50,20 @@ class DonorMatchingService {
                 (d.blood_group = $3) AS is_exact_match
             FROM donors d
             JOIN users u ON d.user_id = u.id
-            WHERE 
+            WHERE
                 u.is_active = TRUE
                 AND d.availability_status = 'Available'
-                AND (d.last_donation_date IS NULL OR d.last_donation_date <= CURRENT_DATE - INTERVAL '90 days')
+                AND d.location_consent = TRUE
+                AND d.age BETWEEN 18 AND 65 AND d.weight_kg >= 45
+                AND (d.last_donation_date IS NULL OR d.last_donation_date <= CURRENT_DATE - $7::integer)
+                AND ($8::text <> 'Critical' OR d.emergency_ready = TRUE)
                 AND d.blood_group = ANY($4::blood_group_type[])
                 AND ST_DWithin(
                     d.geom::geography,
                     ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
                     $5
                 )
-            ORDER BY 
+            ORDER BY
                 is_exact_match DESC,
                 distance_meters ASC
             LIMIT $6;
@@ -75,6 +76,8 @@ class DonorMatchingService {
             compatibleGroups,
             searchRadius,
             limit,
+            policy.cooldownDays,
+            urgency,
         ];
 
         const result = await db.query(sql, values);
@@ -98,13 +101,19 @@ class DonorMatchingService {
      * Trigger matching process for an existing blood request,
      * persist matches in `donor_matches` table, and send notifications.
      */
-    async matchAndNotifyDonors(bloodRequest) {
-        const coordsResult = await db.query(`
-            SELECT 
+    async matchAndNotifyDonors(bloodRequest, radiusKm) {
+        const client = await db.getClient();
+        try {
+        await client.query('BEGIN');
+        const locked = await client.query("SELECT * FROM blood_requests WHERE id=$1 AND status IN ('active','matching') AND (required_before IS NULL OR required_before>NOW()) FOR UPDATE", [bloodRequest.id]);
+        if(!locked.rowCount) throw Object.assign(new Error('Request is closed or unavailable.'), {statusCode:409});
+        bloodRequest = locked.rows[0];
+        const coordsResult = await client.query(`
+            SELECT
                 ST_X(geom) AS longitude,
                 ST_Y(geom) AS latitude
             FROM blood_requests
-            WHERE id = $1;
+            WHERE id = $1 AND status IN ('active','matching') AND (required_before IS NULL OR required_before > NOW());
         `, [bloodRequest.id]);
 
         if (coordsResult.rows.length === 0) {
@@ -118,11 +127,12 @@ class DonorMatchingService {
             longitude,
             bloodGroup: bloodRequest.blood_group,
             urgency: bloodRequest.urgency,
-            radiusMeters: 15000,
+            radiusMeters: radiusKm === undefined ? undefined : radiusKm * 1000,
             limit: 20,
         });
 
         if (candidateDonors.length === 0) {
+            await client.query('COMMIT');
             return {
                 matchedCount: 0,
                 donors: [],
@@ -141,14 +151,12 @@ class DonorMatchingService {
                     match_status,
                     notified_at
                 )
-                VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-                ON CONFLICT (blood_request_id, donor_id) 
-                DO UPDATE SET 
-                    distance_meters = EXCLUDED.distance_meters,
-                    notified_at = CURRENT_TIMESTAMP
+                SELECT $1, $2, $3, $4, $5, CURRENT_TIMESTAMP FROM blood_requests WHERE id=$1 AND status IN ('active','matching') AND (required_before IS NULL OR required_before > NOW())
+                ON CONFLICT (blood_request_id, donor_id)
+                DO NOTHING
                 RETURNING id;
             `;
-            return db.query(insertMatchSql, [
+            return client.query(insertMatchSql, [
                 bloodRequest.id,
                 donor.donorId,
                 donor.distanceMeters,
@@ -157,17 +165,20 @@ class DonorMatchingService {
             ]);
         });
 
-        await Promise.all(matchPromises);
+        const inserted = await Promise.all(matchPromises);
+        const newDonors = candidateDonors.filter((_, i) => inserted[i].rowCount > 0);
 
         // Update request status to 'matching'
-        await db.query(
+        await client.query(
             `UPDATE blood_requests SET status = 'matching' WHERE id = $1 AND status = 'active'`,
             [bloodRequest.id]
         );
 
+        await client.query('COMMIT');
+
         // Notify each donor via NotificationService
-        for (const donor of candidateDonors) {
-            notificationService.notifyDonorMatch({
+        for (const donor of newDonors) {
+            await notificationService.notifyDonorMatch({
                 userId: donor.userId,
                 phone: donor.phone,
                 donorName: donor.fullName,
@@ -179,7 +190,7 @@ class DonorMatchingService {
                 distanceKm: donor.distanceKm,
                 requestId: bloodRequest.id,
             }).catch(err => {
-                console.error(`Notification failed for donor ${donor.fullName}:`, err.message);
+                console.error('Match notification failed:', err.code || 'delivery_error');
             });
         }
 
@@ -187,6 +198,8 @@ class DonorMatchingService {
             matchedCount: candidateDonors.length,
             donors: candidateDonors,
         };
+        } catch(error) { await client.query('ROLLBACK'); throw error; }
+        finally { client.release(); }
     }
 }
 

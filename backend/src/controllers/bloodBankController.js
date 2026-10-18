@@ -10,7 +10,7 @@ const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const getProfile = async (req, res, next) => {
     try {
         const query = `
-            SELECT 
+            SELECT
                 b.id,
                 b.blood_bank_name,
                 b.license_number,
@@ -56,22 +56,22 @@ const updateProfile = async (req, res, next) => {
             longitude,
         } = req.body;
 
-        const coords = (latitude && longitude)
+        const coords = (latitude !== undefined || longitude !== undefined)
             ? resolveCoordinates(latitude, longitude)
             : null;
 
         const updateSql = `
             UPDATE blood_banks
-            SET 
+            SET
                 blood_bank_name = COALESCE($1, blood_bank_name),
                 director_name = COALESCE($2, director_name),
                 contact_number = COALESCE($3, contact_number),
                 operating_hours = COALESCE($4, operating_hours),
                 address = COALESCE($5, address),
-                geom = CASE 
-                    WHEN $6::numeric IS NOT NULL AND $7::numeric IS NOT NULL 
+                geom = CASE
+                    WHEN $6::numeric IS NOT NULL AND $7::numeric IS NOT NULL
                     THEN ST_SetSRID(ST_MakePoint($7, $6), 4326)
-                    ELSE geom 
+                    ELSE geom
                 END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE user_id = $8
@@ -106,7 +106,7 @@ const updateProfile = async (req, res, next) => {
 const getBloodBanksList = async (req, res, next) => {
     try {
         const query = `
-            SELECT 
+            SELECT
                 b.id,
                 b.blood_bank_name,
                 b.director_name,
@@ -118,7 +118,7 @@ const getBloodBanksList = async (req, res, next) => {
                 ST_X(b.geom) AS longitude
             FROM blood_banks b
             JOIN users u ON b.user_id = u.id
-            WHERE u.is_active = TRUE
+            WHERE u.is_active = TRUE AND b.verification_status='verified'
             ORDER BY b.verification_status DESC, b.blood_bank_name ASC;
         `;
         const result = await db.query(query);
@@ -198,7 +198,7 @@ const updateInventory = async (req, res, next) => {
             INSERT INTO blood_inventory (blood_bank_id, blood_group, units_available, last_updated)
             VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
             ON CONFLICT (blood_bank_id, blood_group)
-            DO UPDATE SET 
+            DO UPDATE SET
                 units_available = $3,
                 last_updated = CURRENT_TIMESTAMP
             RETURNING blood_group, units_available, last_updated;

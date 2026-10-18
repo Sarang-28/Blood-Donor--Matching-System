@@ -57,6 +57,7 @@ function RoleSelection() {
       path: "/dashboard/blood_bank",
       desc: "Track real-time blood stock inventory across all 8 blood groups.",
     },
+    { roleKey:"ngo", title:"NGO", desc:"Coordinate assigned emergency requests", icon:"🤝", image:"/role_images/ngo.jpg", path:"/dashboard/ngo" },
   ];
 
   const handleRoleSelect = (role) => {

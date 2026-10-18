@@ -3,8 +3,8 @@ const env = require('../config/env');
 class TwilioService {
     constructor() {
         this.isConfigured = Boolean(
-            env.twilio.accountSid && 
-            env.twilio.authToken && 
+            env.twilio.accountSid &&
+            env.twilio.authToken &&
             env.twilio.phoneNumber
         );
 
@@ -21,13 +21,12 @@ class TwilioService {
 
     /**
      * Send SMS notification
-     * @param {string} toPhone 
-     * @param {string} messageText 
+     * @param {string} toPhone
+     * @param {string} messageText
      */
     async sendSms(toPhone, messageText) {
         if (!this.isConfigured || !this.client) {
-            console.log(`[SMS Mock] To: ${toPhone} | Message: "${messageText}"`);
-            return { sent: false, mock: true };
+            return { sent: false, status: 'unconfigured' };
         }
 
         try {
@@ -38,7 +37,7 @@ class TwilioService {
             });
             return { sent: true, sid: message.sid };
         } catch (error) {
-            console.error(`Twilio SMS Error to ${toPhone}:`, error.message);
+            console.error('Twilio delivery failed:', error.code || 'provider_error');
             return { sent: false, error: error.message };
         }
     }

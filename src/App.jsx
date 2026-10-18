@@ -1,6 +1,4 @@
-import { useEffect } from "react";
-import { Navigate, Routes, Route, useLocation } from "react-router-dom";
-import { requestFirebaseNotificationPermission, onMessageListener } from "./config/firebase";
+import { Navigate, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Navbar from "./components/Navbar";
 import Landing from "./pages/Landing";
@@ -20,34 +18,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 const APP_ROLES = ["donor", "hospital", "patient", "blood_bank", "ngo"];
 
 function App() {
-  const location = useLocation();
-
-  useEffect(() => {
-    // Only request permission if user is logged in
-    const token = localStorage.getItem("token");
-    if (token) {
-      requestFirebaseNotificationPermission();
-    }
-  }, [location.pathname]); // Re-check when route changes
-
-  useEffect(() => {
-    const handlePushNotification = async () => {
-      try {
-        const payload = await onMessageListener();
-        if (payload && payload.notification) {
-          // Display push notification using browser's native API if in foreground
-          // or you could use a toast library here.
-          new Notification(payload.notification.title, {
-            body: payload.notification.body,
-          });
-        }
-        handlePushNotification(); // Call recursively to listen for the next message
-      } catch (err) {
-        console.error('Failed to listen to FCM messages', err);
-      }
-    };
-    handlePushNotification();
-  }, []);
 
   return (
     <Routes>
@@ -85,7 +55,7 @@ function App() {
           key={`blood-requests-${role}`}
           path={`/blood-requests/${role}`}
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[role]}>
               <>
                 <Navbar role={role} />
                 <BloodRequests role={role} />
@@ -101,7 +71,7 @@ function App() {
           key={`donors-${role}`}
           path={`/donors/${role}`}
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[role]}>
               <>
                 <Navbar role={role} />
                 <Donors role={role} />
@@ -133,7 +103,7 @@ function App() {
           key={`dashboard-${role}`}
           path={`/dashboard/${role}`}
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[role]}>
               <>
                 <Navbar role={role} />
                 <Dashboard role={role} />
@@ -149,7 +119,7 @@ function App() {
           key={`profile-${role}`}
           path={`/profile/${role}`}
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[role]}>
               <>
                 <Navbar role={role} />
                 <Profile role={role} />

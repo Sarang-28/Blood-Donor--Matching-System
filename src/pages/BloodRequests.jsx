@@ -1,3 +1,5 @@
+import HospitalPicker from '../components/HospitalPicker';
+import LocationPicker from '../components/LocationPicker';
 import {
   Box,
   Card,
@@ -27,16 +29,7 @@ import { useAuth } from "../context/AuthContext";
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const URGENCIES = ["Normal", "Urgent", "Critical"];
 
-const BLOOD_COMPATIBILITY = {
-    'A+': ['A+', 'A-', 'O+', 'O-'],
-    'A-': ['A-', 'O-'],
-    'B+': ['B+', 'B-', 'O+', 'O-'],
-    'B-': ['B-', 'O-'],
-    'AB+': ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
-    'AB-': ['AB-', 'A-', 'B-', 'O-'],
-    'O+': ['O+', 'O-'],
-    'O-': ['O-'],
-};
+import BLOOD_COMPATIBILITY from '../../shared/bloodCompatibility.json';
 
 function BloodRequests({ role }) {
   const { user, profile } = useAuth();
@@ -105,8 +98,8 @@ function BloodRequests({ role }) {
   const handleManualOffer = async (req) => {
     try {
       const res = await api.post("/matches/manual-offer", { requestId: req.id });
-      setAlertMsg({ type: "success", text: "Thank you for offering to donate! You can start sharing your live location." });
-      return res.data.data.id;
+      setAlertMsg({ type: "success", text: `Offer sent. Wait for requester approval in your donor portal. Save your hospital confirmation code: ${res.data.data.otpCode}.` });
+      return null;
     } catch (err) {
       setAlertMsg({ type: "error", text: err.response?.data?.message || "Failed to offer blood." });
       throw err;
@@ -235,7 +228,7 @@ function BloodRequests({ role }) {
               const reqGroup = req.bloodGroup || req.blood_group;
               const myGroup = profile?.blood_group || profile?.bloodGroup;
               const normalizedRole = (role || "").toLowerCase();
-              
+
               let canDonate = true;
               if (normalizedRole === 'donor') {
                   const compatibleDonors = BLOOD_COMPATIBILITY[reqGroup] || [];
@@ -243,13 +236,13 @@ function BloodRequests({ role }) {
               }
 
               return (
-                <Grid size={{ xs: 12, md: 6 }} key={req.id || Math.random()}>
-                  <RequestCard 
-                    request={req} 
-                    userRole={normalizedRole} 
+                <Grid size={{ xs: 12, md: 6 }} key={req.id}>
+                  <RequestCard
+                    request={req}
+                    userRole={normalizedRole}
                     isOwner={req.requesterUserId === user?.id}
                     onTrack={setTrackingRequestId}
-                    onRespond={canDonate || normalizedRole !== 'donor' ? handleManualOffer : undefined} 
+                    onRespond={canDonate || normalizedRole !== 'donor' ? handleManualOffer : undefined}
                   />
                 </Grid>
               );
@@ -350,6 +343,7 @@ function BloodRequests({ role }) {
                 value={formData.locationName}
                 onChange={(e) => setFormData({ ...formData, locationName: e.target.value })}
               />
+            <HospitalPicker value={formData} onChange={setFormData}/><LocationPicker value={formData} onChange={setFormData}/><TextField fullWidth label="Required before" type="datetime-local" slotProps={{inputLabel:{shrink:true}}} value={formData.requiredBefore || ""} onChange={e=>setFormData({...formData,requiredBefore:e.target.value})}/>
             </DialogContent>
             <DialogActions sx={{ p: 2 }}>
               <Button onClick={() => setDialogOpen(false)} sx={{ textTransform: "none" }}>
@@ -367,7 +361,7 @@ function BloodRequests({ role }) {
             </DialogActions>
           </form>
         </Dialog>
-        
+
         {trackingRequestId && (
           <TrackDonorsDialog
             open={Boolean(trackingRequestId)}

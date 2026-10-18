@@ -177,7 +177,7 @@ function Donors({ role }) {
               const displayLoc = donor.location_name || donor.location || "Pune";
 
               return (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={donor.id || Math.random()}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={donor.id}>
                   <Card
                     component={motion.div}
                     whileHover={{ y: -4, boxShadow: "0 10px 25px rgba(0,0,0,0.08)" }}

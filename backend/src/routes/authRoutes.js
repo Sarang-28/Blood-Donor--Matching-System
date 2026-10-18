@@ -23,7 +23,7 @@ router.post(
         body('role')
             .isIn(ALL_ROLES.filter(r => r !== 'admin'))
             .withMessage('Invalid role selected'),
-        body('phone').notEmpty().withMessage('Phone number is required'),
+        body('phone').isString().bail().customSanitizer(value => value.replace(/[\s()-]/g, '')).matches(/^\+?[0-9]{8,15}$/).withMessage('Phone must contain 8–15 digits, optionally prefixed with +'),
         validate,
     ],
     authController.register
@@ -63,6 +63,7 @@ router.post(
  * @access  Private
  */
 router.get('/me', authenticateToken, authController.getMe);
+router.post('/change-password', authenticateToken, authController.changePassword);
 
 /**
  * @route   POST /api/auth/logout

@@ -5,6 +5,7 @@ const { authorizeRoles } = require('../middlewares/roleMiddleware');
 const { ROLES } = require('../constants/roles');
 
 const router = express.Router();
+router.patch('/:matchId/review', authenticateToken, matchingController.reviewDonor);
 
 /**
  * @route   GET /api/matches/my-alerts

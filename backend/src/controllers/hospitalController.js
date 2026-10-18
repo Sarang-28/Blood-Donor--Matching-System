@@ -8,7 +8,7 @@ const { apiSuccess, apiError } = require('../utils/apiResponse');
 const getProfile = async (req, res, next) => {
     try {
         const query = `
-            SELECT 
+            SELECT
                 h.id,
                 h.hospital_name,
                 h.license_number,
@@ -52,21 +52,21 @@ const updateProfile = async (req, res, next) => {
             longitude,
         } = req.body;
 
-        const coords = (latitude && longitude)
+        const coords = (latitude !== undefined || longitude !== undefined)
             ? resolveCoordinates(latitude, longitude)
             : null;
 
         const updateSql = `
             UPDATE hospitals
-            SET 
+            SET
                 hospital_name = COALESCE($1, hospital_name),
                 address = COALESCE($2, address),
                 emergency_contact = COALESCE($3, emergency_contact),
                 speciality = COALESCE($4, speciality),
-                geom = CASE 
-                    WHEN $5::numeric IS NOT NULL AND $6::numeric IS NOT NULL 
+                geom = CASE
+                    WHEN $5::numeric IS NOT NULL AND $6::numeric IS NOT NULL
                     THEN ST_SetSRID(ST_MakePoint($6, $5), 4326)
-                    ELSE geom 
+                    ELSE geom
                 END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE user_id = $7
@@ -100,7 +100,7 @@ const updateProfile = async (req, res, next) => {
 const getHospitalList = async (req, res, next) => {
     try {
         const query = `
-            SELECT 
+            SELECT
                 h.id,
                 h.hospital_name,
                 h.address,
@@ -111,7 +111,7 @@ const getHospitalList = async (req, res, next) => {
                 ST_X(h.geom) AS longitude
             FROM hospitals h
             JOIN users u ON h.user_id = u.id
-            WHERE u.is_active = TRUE
+            WHERE u.is_active = TRUE AND h.verification_status='verified'
             ORDER BY h.verification_status DESC, h.hospital_name ASC;
         `;
         const result = await db.query(query);
@@ -128,7 +128,7 @@ const getHospitalById = async (req, res, next) => {
     try {
         const { id } = req.params;
         const query = `
-            SELECT 
+            SELECT
                 h.id,
                 h.hospital_name,
                 h.license_number,
@@ -137,7 +137,7 @@ const getHospitalById = async (req, res, next) => {
                 h.speciality,
                 h.verification_status
             FROM hospitals h
-            WHERE h.id = $1;
+            WHERE h.id = $1 AND h.verification_status='verified' AND EXISTS(SELECT 1 FROM users WHERE id=h.user_id AND is_active);
         `;
         const result = await db.query(query, [id]);
         if (result.rows.length === 0) {

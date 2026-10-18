@@ -1,3 +1,4 @@
+import LocationPicker from '../components/LocationPicker';
 import { useState, useEffect } from "react";
 import {
   Alert,
@@ -26,6 +27,7 @@ import LoginButton from "../components/LoginButton";
 import { useAuth } from "../context/AuthContext";
 
 const ROLES = [
+  {value:"ngo",label:"NGO",icon:<FavoriteIcon/>},
   {
     value: "donor",
     label: "Donor",
@@ -67,6 +69,8 @@ function Register() {
     email: user?.email || "",
     password: "",
     phone: user?.phone || "",
+    age: "",
+    weightKg: "",
     bloodGroup: profile?.blood_group || "O+",
     lastDonationDate: "",
     location: profile?.location_name || profile?.address || "Pune, Maharashtra",
@@ -327,19 +331,19 @@ function Register() {
                 <TextField
                   fullWidth
                   label={
-                    role === "hospital" || role === "blood_bank"
+                    role === "hospital" || (role === "blood_bank" || role === "ngo")
                       ? "Institution / Organization Name"
                       : "Full Name"
                   }
                   margin="normal"
                   required
                   value={
-                    role === "hospital" || role === "blood_bank"
+                    role === "hospital" || (role === "blood_bank" || role === "ngo")
                       ? formData.organizationName
                       : formData.fullName
                   }
                   onChange={
-                    role === "hospital" || role === "blood_bank"
+                    role === "hospital" || (role === "blood_bank" || role === "ngo")
                       ? handleChange("organizationName")
                       : handleChange("fullName")
                   }
@@ -506,7 +510,7 @@ function Register() {
                 )}
 
                 {/* BLOOD BANK FIELDS */}
-                {role === "blood_bank" && (
+                {(role === "blood_bank" || role === "ngo") && (
                   <>
                     <TextField
                       fullWidth
@@ -548,6 +552,8 @@ function Register() {
                 )}
 
                 <Box sx={{ mt: 3 }}>
+                  <>{role === "donor" && <Box sx={{display:"flex",gap:1}}><TextField label="Age" type="number" required value={formData.age} onChange={handleChange("age")}/><TextField label="Weight (kg)" type="number" required value={formData.weightKg} onChange={handleChange("weightKg")}/></Box>}</>
+                  <LocationPicker value={formData} onChange={setFormData} donor={role === "donor"}/>
                   <LoginButton type="submit" disabled={loading}>
                     {loading ? <CircularProgress size={24} color="inherit" /> : "Complete Registration"}
                   </LoginButton>

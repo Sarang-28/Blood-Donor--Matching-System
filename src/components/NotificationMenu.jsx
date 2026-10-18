@@ -17,9 +17,13 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import TrackDonorsDialog from './TrackDonorsDialog';
 
 export default function NotificationMenu() {
   const { isAuthenticated } = useAuth();
+  const navigate=useNavigate();
+  const [reviewRequestId,setReviewRequestId]=useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -33,7 +37,7 @@ export default function NotificationMenu() {
 
       // Defensively parse notifications array regardless of API response shape
       const rawData = res.data?.data || res.data?.notifications || res.data;
-      const items = Array.isArray(rawData) ? rawData : [];
+      const items = Array.isArray(rawData) ? rawData : rawData.notifications || [];
 
       setNotifications(items);
       setUnreadCount(items.filter((n) => !n.is_read && !n.isRead).length);
@@ -63,7 +67,7 @@ export default function NotificationMenu() {
 
   const handleMarkAllRead = async () => {
     try {
-      await api.patch('/notifications/mark-all-read');
+      await api.patch('/notifications/read-all');
       setNotifications((prev) =>
         (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, is_read: true, isRead: true }))
       );
@@ -182,6 +186,8 @@ export default function NotificationMenu() {
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                           {item.body || item.message}
                         </Typography>
+                        {item.payload?.action === 'review_donor' && <Button size="small" onClick={event=>{event.stopPropagation();handleMarkOne(item.id);handleClose();setReviewRequestId(item.payload.requestId);}}>Review donor</Button>}
+                        {item.payload?.action === 'view_donor_portal' && <Button size="small" onClick={event=>{event.stopPropagation();handleMarkOne(item.id);handleClose();navigate('/dashboard/donor');}}>View response</Button>}
                         {item.created_at && (
                           <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
                             {new Date(item.created_at).toLocaleString()}
@@ -196,6 +202,7 @@ export default function NotificationMenu() {
           </List>
         )}
       </Menu>
+      <TrackDonorsDialog open={Boolean(reviewRequestId)} onClose={()=>setReviewRequestId(null)} requestId={reviewRequestId}/>
     </>
   );
 }

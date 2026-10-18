@@ -18,6 +18,8 @@ const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
+// Exact proxy subnet/IP list only; never trust arbitrary forwarded headers.
+if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY.split(',').map(s => s.trim()));
 
 // Security HTTP headers
 app.use(helmet());
@@ -26,21 +28,14 @@ app.use(helmet());
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 
 // CORS configuration
-const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:5000',
-    env.clientUrl,
-].filter(Boolean);
+const allowedOrigins = env.allowedOrigins;
 
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (mobile apps, curl, same-origin, server-to-server)
         if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) return callback(null, true);
-        // Allow any Vercel preview or production deployments
-        if (origin.endsWith('.vercel.app')) return callback(null, true);
-        return callback(null, true);
+        return callback(Object.assign(new Error('Origin is not permitted.'), { statusCode: 403 }));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -73,10 +68,16 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/admin-login', authLimiter);
+app.use('/api/auth/admin/login', authLimiter);
+app.use('/api/auth/change-password', authLimiter);
 
 // Body parser with payload limits
 app.use(express.json({ limit: '20kb' }));
 app.use(express.urlencoded({ extended: true, limit: '20kb' }));
+
+app.use('/api', require('./middlewares/inputMiddleware'));
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 // Backend root endpoint
 app.get('/', (req, res) => {
@@ -118,16 +119,20 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes Mounting
+app.use('/api/public', require('./routes/publicRoutes'));
+app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/auth', authRoutes);
+app.use('/api/account', require('./routes/accountRoutes'));
 app.use('/api/donors', donorRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/blood-banks', bloodBankRoutes);
 // Backward compatibility alias for ngo endpoint
-app.use('/api/ngos', bloodBankRoutes);
+app.use('/api/ngos', require('./routes/ngoRoutes'));
 app.use('/api/blood-requests', bloodRequestRoutes);
 app.use('/api/matches', matchingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin', require('./routes/reportRoutes'));
 app.use('/api/notifications', notificationRoutes);
 
 // Fallback 404 handler for undefined routes

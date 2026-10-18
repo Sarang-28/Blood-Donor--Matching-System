@@ -1,73 +1,22 @@
-# BloodConnect - Hyperlocal Emergency Blood Donor Matching System
+# BloodMatch
 
-BloodConnect is a modern, fast, and responsive web application designed to connect blood donors, hospitals, patients, and NGOs in real-time during emergencies. Built with React and Vite, it aims to reduce the time it takes to find a matching blood donor in critical situations.
+React/Vite + Material UI frontend, Express API, PostgreSQL/PostGIS matching and optional Socket.IO, Twilio and Firebase notifications.
 
-## Features
+Read [setup and deployment](docs/DEPLOYMENT.md), [feature inventory and limitations](docs/IMPLEMENTATION.md), [API reference](docs/API.md), and [test/demo guide](docs/TESTING.md) before running against real user data.
 
-- **Role-Based Dashboards**: Tailored interfaces for Donors, Hospitals, Patients, and NGOs.
-- **Real-Time Matching**: Instantly find matching donors based on location and blood type.
-- **Emergency Alerts**: Notify nearby eligible donors instantly during critical shortages.
-- **Modern UI/UX**: Built with Material UI (MUI) and Framer Motion for a sleek, responsive, and accessible experience.
-
-## Tech Stack
-
-- **Frontend Framework**: React 19
-- **Build Tool**: Vite
-- **Styling & UI Components**: Material UI (MUI v9)
-- **Animations**: Framer Motion
-- **Icons**: Material Icons & React Icons
-- **Routing**: React Router DOM
-- **Charts**: Recharts (for future analytics integration)
-
-## Getting Started
-
-### Prerequisites
-
-Ensure you have [Node.js](https://nodejs.org/) installed on your machine.
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Sarang-28/Blood-Donor--Matching-System.git
-   cd Blood-Donor--Matching-System
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-4. Open your browser and navigate to `http://localhost:5173`.
-
-### Demo Login
-
-To test the application, you can use the following dummy credentials on the login screen:
-
-- **Username**: `admin`
-- **Password**: `123`
-
-## Project Structure
-
-```
-src/
-├── assets/        # Static assets like images and global styles
-├── components/    # Reusable UI components (Navbar, Sidebar, LoginButton)
-├── pages/         # Page-level components (Login, Dashboard, RoleSelection, etc.)
-├── theme/         # MUI custom theme configuration
-├── App.jsx        # Main application routing
-└── main.jsx       # Entry point
+```powershell
+npm ci --ignore-scripts
+# Configure .env and backend/.env from their examples first.
+npm run init-db --workspace backend
+npm run dev --workspace backend
+# In another terminal:
+npm run dev
 ```
 
-## Contributing
+Existing databases use `npm run migrate --workspace backend` instead of initialization. No default administrator or fabricated operational records are seeded. Use environment-based administrator provisioning described in the deployment guide.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Matching applies the shared red-cell compatibility matrix, consent, account activity, availability, age/weight screening and configurable donation interval, then PostGIS ST_DWithin/ST_Distance. Exact blood groups rank first, then distance. Default search radius is 10 km and can be changed by an administrator; critical matching respects the radius and emergency-ready setting. Geography expression indexes support metre-based spatial queries.
 
-## License
+Requests progress through active → matching → fulfilled, cancelled or expired. Partial fulfillment is recorded with unit counts while the request stays open. Only the responsible verified hospital can confirm donations. Final eligibility and transfusion decisions require qualified medical professionals and clinical testing.
 
-This project is open-source and available under the MIT License.
+`npm test`, `npm run build`, `npm run lint`, and `npm audit` provide local checks. Integration tests require an explicit disposable TEST_DATABASE_URL and clear that database's application records. See the test guide.

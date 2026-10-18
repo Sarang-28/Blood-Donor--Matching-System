@@ -1,4 +1,3 @@
-
 import {
   Drawer,
   List,
@@ -55,7 +54,7 @@ function Sidebar({ role }) {
       ]
       : []),
 
-    ...(role === "blood_bank" || role === "ngo"
+    ...(role === "blood_bank"
       ? [
         { text: "Inventory", pathId: "inventory", icon: <BloodtypeIcon /> },
         { text: "Blood Requests", pathId: "blood-requests", icon: <BloodtypeIcon /> },

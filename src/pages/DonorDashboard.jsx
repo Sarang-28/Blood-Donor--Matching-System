@@ -24,9 +24,12 @@ import RequestCard from '../components/RequestCard';
 import LiveLocationBroadcaster from '../components/LiveLocationBroadcaster';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { directionsUrl } from '../config/maps';
 
 export default function DonorDashboard() {
   const { profile, user } = useAuth();
+  const [donorProfile,setDonorProfile]=useState(profile);
+  const [history,setHistory]=useState([]);
   const [requests, setRequests] = useState([]);
   const [isAvailable, setIsAvailable] = useState(profile?.availability_status === 'Available');
   const [loading, setLoading] = useState(true);
@@ -35,17 +38,19 @@ export default function DonorDashboard() {
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        setLoading(true);
         // Fetch personal match alerts instead of all public requests
-        const res = await api.get('/matches/my-alerts');
+        const [res,p,h] = await Promise.all([api.get('/matches/my-alerts'),api.get('/donors/profile'),api.get('/donors/history')]);
+        setDonorProfile(p.data.data);setIsAvailable(p.data.data.availability_status==='Available');setHistory(h.data.data);
         setRequests(res.data.data || []);
       } catch (err) {
-        console.error('Failed to load emergency blood requests:', err);
+        setActionMsg({type:'error',text:'Could not load donor requests. Please retry.'});
       } finally {
         setLoading(false);
       }
     };
     fetchRequests();
+    const timer=setInterval(fetchRequests,15000);
+    return ()=>clearInterval(timer);
   }, []);
 
   const handleToggleAvailability = async (e) => {
@@ -65,13 +70,13 @@ export default function DonorDashboard() {
     try {
       const res = await api.patch(`/matches/${req.matchId}/respond`, { response: 'accepted' });
       const { otpCode } = res.data.data;
-      
+
       // Update local state to hide or mark the match as accepted
-      setRequests(requests.map(r => r.matchId === req.matchId ? { ...r, matchStatus: 'accepted', otpCode } : r));
+      setRequests(requests.map(r => r.matchId === req.matchId ? { ...r, matchStatus: 'accepted', requesterDecision: 'pending', otpCode } : r));
 
       setActionMsg({
         type: 'success',
-        text: `Match accepted! Your OTP is ${otpCode}. Please share this code with the hospital when you donate blood.`,
+        text: `Offer sent. Waiting for requester approval. Save your hospital confirmation code: ${otpCode}.`,
       });
     } catch (err) {
       console.error('Failed to respond to match:', err);
@@ -145,9 +150,9 @@ export default function DonorDashboard() {
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <StatCard
               title="Donation Cooldown"
-              value="Eligible"
+              value={donorProfile?.eligible ? 'Interval clear' : 'Not eligible'}
               icon={<EventAvailableIcon sx={{ fontSize: 28, color: '#2E7D32' }} />}
-              subtitle="90 days interval clear"
+              subtitle="Final eligibility requires clinical assessment"
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -160,6 +165,8 @@ export default function DonorDashboard() {
           </Grid>
         </Grid>
 
+        <Typography variant="h6">Verified donation history</Typography>
+        {history.length ? history.map(d=><Typography key={d.id}>{new Date(d.donation_date).toLocaleDateString()} · {d.hospital_name} · {d.units_donated} unit(s)</Typography>) : <Typography>No verified donations yet.</Typography>}
         {/* Emergency Requests Section */}
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
           Nearby Emergency Requests
@@ -179,17 +186,25 @@ export default function DonorDashboard() {
           <Grid container spacing={3}>
             {requests.map((req) => (
               <Grid size={{ xs: 12, md: 6 }} key={req.matchId}>
-                <RequestCard 
-                   request={req} 
-                   onRespond={req.matchStatus !== 'accepted' ? handleRespond : null} 
-                   userRole="donor" 
+                <RequestCard
+                   request={req}
+                   onRespond={req.matchStatus === 'notified' ? handleRespond : null}
+                   userRole="donor"
                 />
-                {req.matchStatus === 'accepted' && req.otpCode && (
+                {req.matchStatus === 'notified' && <Button onClick={async()=>{try{await api.patch(`/matches/${req.matchId}/respond`,{response:'declined'});setRequests(rows=>rows.map(r=>r.matchId===req.matchId?{...r,matchStatus:'declined'}:r));}catch(e){setActionMsg({type:'error',text:e.response?.data?.message||'Could not decline.'});}}}>Decline invitation</Button>}
+                {req.matchStatus === 'accepted' && (
                   <Box sx={{ mt: 2 }}>
-                    <Alert severity="success" sx={{ mb: 2 }}>
-                      Match Accepted. The hospital has been notified.
+                    <Alert severity={req.requesterDecision==='approved'?'success':'info'} sx={{ mb: 2 }}>
+                      {req.requesterDecision==='approved'?'Your offer has been approved.':req.requesterDecision==='rejected'?'The requester did not select your offer.':'The requester has been notified. Waiting for approval before sharing contact details.'}
                     </Alert>
-                    <LiveLocationBroadcaster matchId={req.matchId} />
+                    {req.contactDetails && <Card sx={{p:2,mb:2}}>
+                      <Typography variant="h6">Approved contact details</Typography>
+                      <Typography>Patient: {req.contactDetails.patientName}</Typography>
+                      <Typography>Destination: {req.contactDetails.hospitalName} — {req.contactDetails.locationName}</Typography>
+                      <Button component="a" href={`tel:${req.contactDetails.contactPhone}`}>Call {req.contactDetails.contactPhone}</Button>
+                      <Button component="a" href={directionsUrl(req.contactDetails.latitude,req.contactDetails.longitude)} target="_blank" rel="noopener noreferrer">Directions to destination</Button>
+                      <LiveLocationBroadcaster matchId={req.matchId} />
+                    </Card>}
                   </Box>
                 )}
               </Grid>

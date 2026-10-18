@@ -16,7 +16,7 @@ export default function RequestCard({ request, onRespond, onRecordDonation, onTr
   const isUrgent = request.urgency === 'Urgent';
 
   const socket = useSocket();
-  const [matchStatus, setMatchStatus] = useState(request.matchStatus || null); 
+  const [matchStatus, setMatchStatus] = useState(request.matchStatus || null);
   const [isSharing, setIsSharing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeMatchId, setActiveMatchId] = useState(null);
@@ -52,7 +52,7 @@ export default function RequestCard({ request, onRespond, onRecordDonation, onTr
       return;
     }
 
-    if (!activeMatchId) return;
+    if (!activeMatchId || !socket?.connected) { alert('Live tracking is unavailable. Coordinate through your hospital.'); return; }
 
     socket.emit('join_tracking_room', { matchId: activeMatchId, role: 'donor' });
     setIsSharing(true);
@@ -211,10 +211,10 @@ export default function RequestCard({ request, onRespond, onRecordDonation, onTr
                   {loading ? <CircularProgress size={24} color="inherit" /> : 'Offer Blood Donation'}
                 </Button>
               ) : !isSharing ? (
-                <Button 
-                  color="success" 
-                  fullWidth 
-                  startIcon={<MyLocationIcon />} 
+                <Button
+                  color="success"
+                  fullWidth
+                  startIcon={<MyLocationIcon />}
                   variant="contained"
                   onClick={handleStartSharing}
                   sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, boxShadow: 'none' }}
@@ -222,10 +222,10 @@ export default function RequestCard({ request, onRespond, onRecordDonation, onTr
                   Start Sharing Live Location
                 </Button>
               ) : (
-                <Button 
-                  color="error" 
-                  fullWidth 
-                  startIcon={<StopIcon />} 
+                <Button
+                  color="error"
+                  fullWidth
+                  startIcon={<StopIcon />}
                   variant="outlined"
                   onClick={handleStopSharing}
                   sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}

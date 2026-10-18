@@ -1,6 +1,5 @@
 const db = require('../config/db');
 const notificationService = require('../services/notificationService');
-const { VERIFICATION_STATUS } = require('../constants/statuses');
 const { apiSuccess, apiError } = require('../utils/apiResponse');
 
 /**
@@ -24,10 +23,10 @@ const getStats = async (req, res, next) => {
             db.query('SELECT COUNT(*) FROM donors;'),
             db.query('SELECT COUNT(*) FROM hospitals;'),
             db.query("SELECT COUNT(*) FROM blood_requests WHERE status IN ('active', 'matching');"),
-            
+
             // Pending Verifications
             db.query(`
-                SELECT 
+                SELECT
                     'hospital' AS type,
                     h.id,
                     h.hospital_name AS name,
@@ -38,7 +37,7 @@ const getStats = async (req, res, next) => {
                 FROM hospitals h
                 WHERE h.verification_status = 'pending'
                 UNION ALL
-                SELECT 
+                SELECT
                     'blood_bank' AS type,
                     b.id,
                     b.blood_bank_name AS name,
@@ -48,13 +47,14 @@ const getStats = async (req, res, next) => {
                     b.created_at AS "createdAt"
                 FROM blood_banks b
                 WHERE b.verification_status = 'pending'
+                UNION ALL SELECT 'ngo',id,ngo_name,registration_number,address,contact_number,created_at FROM ngos WHERE verification_status='pending'
                 ORDER BY "createdAt" DESC
                 LIMIT 10;
             `),
 
             // Critical Blood Requests
             db.query(`
-                SELECT 
+                SELECT
                     br.id,
                     br.blood_group AS "bloodGroup",
                     br.units_required AS units,
@@ -71,7 +71,7 @@ const getStats = async (req, res, next) => {
 
             // Recently Registered Users
             db.query(`
-                SELECT 
+                SELECT
                     id, email, role, phone, is_active AS "isActive", created_at AS "createdAt"
                 FROM users
                 ORDER BY created_at DESC
@@ -80,8 +80,8 @@ const getStats = async (req, res, next) => {
 
             // Recent Blood Requests
             db.query(`
-                SELECT 
-                    id, blood_group AS "bloodGroup", hospital_name AS hospital, 
+                SELECT
+                    id, blood_group AS "bloodGroup", hospital_name AS hospital,
                     location_name AS location, units_required AS units, urgency, status,
                     created_at AS "createdAt"
                 FROM blood_requests
@@ -157,13 +157,18 @@ const updateUserStatus = async (req, res, next) => {
         const { id } = req.params;
         const { isActive } = req.body;
 
+        if (typeof isActive !== 'boolean') return apiError(res,'isActive must be boolean.',400);
+        if (id === req.user.id) return apiError(res,'You cannot suspend your own account.',400);
         const updateSql = `
-            UPDATE users
-            SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+            WITH changed AS (UPDATE users
+            SET is_active = $1, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP
             WHERE id = $2
-            RETURNING id, email, role, is_active AS "isActive";
+            RETURNING id, email, role, is_active AS "isActive"), logged AS (
+              INSERT INTO audit_logs(actor_user_id,action,target_id,metadata)
+              SELECT $3,'account.status',id,jsonb_build_object('isActive',"isActive") FROM changed RETURNING id
+            ) SELECT * FROM changed;
         `;
-        const result = await db.query(updateSql, [isActive, id]);
+        const result = await db.query(updateSql, [isActive, id, req.user.id]);
 
         if (result.rows.length === 0) {
             return apiError(res, 'User not found', 404);
@@ -183,9 +188,9 @@ const verifyInstitution = async (req, res, next) => {
     try {
         const { type, id } = req.params; // type: 'hospital' | 'blood_bank' (or 'ngo')
         const { action, remarks } = req.body; // action: 'verified' | 'rejected'
-        const normalizedType = type === 'ngo' ? 'blood_bank' : type;
+        const normalizedType = type;
 
-        if (!['hospital', 'blood_bank'].includes(normalizedType)) {
+        if (!['hospital', 'blood_bank', 'ngo'].includes(normalizedType)) {
             return apiError(res, 'Type must be hospital or blood_bank', 400);
         }
         if (!['verified', 'rejected'].includes(action)) {
@@ -200,9 +205,9 @@ const verifyInstitution = async (req, res, next) => {
         if (normalizedType === 'hospital') {
             const updateHosp = await client.query(`
                 UPDATE hospitals
-                SET 
-                    verification_status = $1,
-                    verified_at = CASE WHEN $1 = 'verified' THEN CURRENT_TIMESTAMP ELSE NULL END,
+                SET
+                    verification_status = $1::verification_status,
+                    verified_at = CASE WHEN $1::text = 'verified' THEN CURRENT_TIMESTAMP ELSE NULL END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = $2
                 RETURNING hospital_name, user_id;
@@ -214,12 +219,16 @@ const verifyInstitution = async (req, res, next) => {
             }
             institutionName = updateHosp.rows[0].hospital_name;
             targetUserId = updateHosp.rows[0].user_id;
+        } else if (normalizedType === 'ngo') {
+            const n = await client.query("UPDATE ngos SET verification_status=$1::verification_status,verified_at=CASE WHEN $1::text='verified' THEN NOW() ELSE NULL END WHERE id=$2 RETURNING ngo_name,user_id",[action,id]);
+            if(!n.rowCount) {await client.query('ROLLBACK');return apiError(res,'NGO not found',404);}
+            institutionName=n.rows[0].ngo_name;targetUserId=n.rows[0].user_id;
         } else {
             const updateBB = await client.query(`
                 UPDATE blood_banks
-                SET 
-                    verification_status = $1,
-                    verified_at = CASE WHEN $1 = 'verified' THEN CURRENT_TIMESTAMP ELSE NULL END,
+                SET
+                    verification_status = $1::verification_status,
+                    verified_at = CASE WHEN $1::text = 'verified' THEN CURRENT_TIMESTAMP ELSE NULL END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = $2
                 RETURNING blood_bank_name, user_id;
@@ -239,6 +248,7 @@ const verifyInstitution = async (req, res, next) => {
             VALUES ($1, $2, $3, $4, $5);
         `, [req.user.id, normalizedType, id, action, remarks || null]);
 
+        await client.query('INSERT INTO audit_logs(actor_user_id,action,target_id,metadata) VALUES($1,$2,$3,$4)',[req.user.id,'institution.verification',id,JSON.stringify({type:normalizedType,action})]);
         await client.query('COMMIT');
 
         // Dispatch notification
@@ -266,7 +276,7 @@ const verifyInstitution = async (req, res, next) => {
 const getCriticalRequests = async (req, res, next) => {
     try {
         const query = `
-            SELECT 
+            SELECT
                 br.*,
                 ROUND((SELECT COUNT(*) FROM donor_matches dm WHERE dm.blood_request_id = br.id)::numeric, 0) AS "matchesCount",
                 ST_Y(br.geom) AS latitude,

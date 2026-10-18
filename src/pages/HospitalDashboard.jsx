@@ -1,3 +1,4 @@
+import LocationPicker from '../components/LocationPicker';
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -62,7 +63,7 @@ export default function HospitalDashboard() {
   const fetchHospitalRequests = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/blood-requests');
+      const res = await api.get('/blood-requests/my');
       setRequests(res.data.data || []);
     } catch (err) {
       console.error('Failed to load hospital requests:', err);
@@ -81,6 +82,7 @@ export default function HospitalDashboard() {
       setSubmitting(true);
       const payload = {
         ...newRequest,
+        role: 'hospital',
         hospitalName: profile?.hospital_name || 'City Hospital',
         unitsRequired: parseInt(newRequest.unitsRequired, 10),
       };
@@ -244,9 +246,9 @@ export default function HospitalDashboard() {
           <Grid container spacing={3}>
             {requests.map((req) => (
               <Grid size={{ xs: 12, md: 6 }} key={req.id}>
-                <RequestCard 
-                  request={req} 
-                  userRole="hospital" 
+                <RequestCard
+                  request={req}
+                  userRole="hospital"
                   onRecordDonation={handleOpenRecordDonation}
                   onRespond={() => handleOpenTrackDonors(req)}
                 />
@@ -260,6 +262,7 @@ export default function HospitalDashboard() {
           <DialogTitle sx={{ fontWeight: 700 }}>Post Urgent Blood Request</DialogTitle>
           <form onSubmit={handleCreateRequest}>
             <DialogContent>
+              <LocationPicker value={newRequest} onChange={setNewRequest}/>
               <TextField
                 fullWidth
                 label="Patient Name"
@@ -375,7 +378,7 @@ export default function HospitalDashboard() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 Enter the 6-digit OTP provided by the donor to verify and record this transfusion handoff.
               </Typography>
-              
+
               <TextField
                 fullWidth
                 label="6-Digit OTP"

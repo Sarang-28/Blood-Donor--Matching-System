@@ -23,6 +23,9 @@ const poolConfig = env.db.connectionString
         keepAlive: true,
       };
 
+poolConfig.statement_timeout = 10000;
+poolConfig.lock_timeout = 5000;
+poolConfig.idle_in_transaction_session_timeout = 15000;
 const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
@@ -49,7 +52,7 @@ const checkConnection = async () => {
         const client = await pool.connect();
         const res = await client.query('SELECT current_database(), version();');
         console.log(`✅ Connected to database: ${res.rows[0].current_database}`);
-        
+
         try {
             const postgis = await client.query('SELECT PostGIS_Version();');
             console.log(`✅ PostGIS extension detected: v${postgis.rows[0].postgis_version}`);

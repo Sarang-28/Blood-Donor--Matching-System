@@ -1,18 +1,12 @@
-FROM node:20-alpine AS builder
-
+FROM node:24-alpine
 WORKDIR /app
-
-# Install build dependencies for native modules like bcrypt
-RUN apk add --no-cache python3 make g++
-
 COPY package*.json ./
-RUN npm ci --only=production
-
-COPY . .
-
-EXPOSE 5000
-
+COPY backend/package.json ./backend/package.json
+RUN npm ci --omit=dev --workspace backend --ignore-scripts
+COPY backend ./backend
+COPY shared ./shared
+USER node
+WORKDIR /app/backend
 ENV NODE_ENV=production
-ENV PORT=5000
-
+EXPOSE 5000
 CMD ["node", "server.js"]

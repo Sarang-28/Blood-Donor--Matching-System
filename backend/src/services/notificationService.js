@@ -38,50 +38,40 @@ class NotificationService {
         requestId,
     }) {
         const title = `🚨 Emergency ${bloodGroup} Blood Needed (${distanceKm} km away)`;
-        const body = `Urgent request for ${units} unit(s) of ${bloodGroup} at ${hospitalName}, ${locationName}. You are a compatible nearby donor!`;
+        const body = `Request for ${units} unit(s) of ${bloodGroup} at ${hospitalName}. Contact details and the exact destination are shared after requester approval.`;
 
-        // 1. In-App Notification
-        await this.createInAppNotification({
-            userId,
-            title,
-            body,
-            type: NOTIFICATION_TYPE.MATCH_ALERT,
-            payload: { requestId, urgency, distanceKm, hospitalName, bloodGroup },
-        });
-
-        // 2. SMS Notification via Twilio
-        if (phone) {
-            const smsText = `EMERGENCY BLOOD ALERT: ${units} unit(s) of ${bloodGroup} needed at ${hospitalName} (${distanceKm}km away). Please check your Blood Donor app to respond.`;
-            await twilioService.sendSms(phone, smsText);
+        const notification = await this.createInAppNotification({userId,title,body,type:NOTIFICATION_TYPE.MATCH_ALERT,payload:{requestId,urgency,distanceKm,hospitalName,bloodGroup}});
+        if (!notification) return;
+        const preferences = (await db.query('SELECT sms_consent,push_consent FROM users WHERE id=$1',[userId])).rows[0];
+        const sms = preferences?.sms_consent ? await twilioService.sendSms(phone, 'A nearby blood request needs your response. Open BloodMatch for details.') : {status:'no_consent'};
+        const push = await this.sendFcmPushNotification(userId, 'BloodMatch invitation', 'Open BloodMatch for details.', {requestId});
+        for(const [channel,result] of [['sms',sms],['push',push]]) {
+            await db.query('INSERT INTO notification_deliveries(notification_id,channel,status) VALUES($1,$2,$3)', [notification.id,channel,result.status || (result.sent?'sent':'failed')]);
         }
-
-        // 3. FCM Push Notification
-        await this.sendFcmPushNotification(userId, title, body, { requestId, type: NOTIFICATION_TYPE.MATCH_ALERT });
     }
 
     /**
      * Helper: Fetch user FCM token and send push notification
      */
     async sendFcmPushNotification(userId, title, body, payload = {}) {
-        if (!firebaseApp) return; // Not configured
+        if (!firebaseApp) return { status: 'unconfigured' }; // Not configured
 
         try {
-            const res = await db.query('SELECT fcm_token FROM users WHERE id = $1', [userId]);
+            const res = await db.query('SELECT fcm_token, push_consent FROM users WHERE id = $1', [userId]);
+            if (!res.rows[0]?.push_consent || !res.rows[0]?.fcm_token) return {status:'no_consent'};
             if (res.rows.length && res.rows[0].fcm_token) {
                 await getMessaging(firebaseApp).send({
                     token: res.rows[0].fcm_token,
-                    notification: {
-                        title,
-                        body,
-                    },
+                    notification: { title: 'BloodMatch update', body: 'Open the app to view this update.' },
                     data: {
                         ...payload,
                         click_action: 'FLUTTER_NOTIFICATION_CLICK', // standard fallback
                     },
                 });
+                return {status:'sent'};
             }
         } catch (error) {
-            console.error(`Failed to send FCM to user ${userId}:`, error.message);
+            return {status:'failed'};
         }
     }
 

@@ -5,6 +5,7 @@ const { authorizeRoles } = require('../middlewares/roleMiddleware');
 const { ROLES } = require('../constants/roles');
 
 const router = express.Router();
+router.get('/', authenticateToken, donorController.getNearbyDonors);
 
 /**
  * @route   GET /api/donors/profile
