@@ -16,8 +16,25 @@ async function authorize(socket, matchId, donorOnly = false) {
         [matchId,socket.data.userId,socket.data.version,donorOnly]);
     return result.rowCount > 0;
 }
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true;
+    if (env.allowedOrigins.includes('*') || env.allowedOrigins.includes(origin)) return true;
+    try {
+        const parsed = new URL(origin);
+        if (parsed.hostname === 'vercel.app' || parsed.hostname.endsWith('.vercel.app')) return true;
+        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') return true;
+    } catch (_) {}
+    return false;
+};
+
 const initializeSocket = server => {
-    io = new Server(server, { cors: { origin: env.allowedOrigins }, maxHttpBufferSize: 4096 });
+    io = new Server(server, {
+        cors: {
+            origin: (origin, callback) => isAllowedOrigin(origin) ? callback(null, true) : callback(new Error('Origin not allowed')),
+            credentials: true
+        },
+        maxHttpBufferSize: 4096
+    });
     io.use(async (socket,next) => {
         try {
             const decoded=jwt.verify(socket.handshake.auth?.token,env.jwt.secret,{algorithms:['HS256']});

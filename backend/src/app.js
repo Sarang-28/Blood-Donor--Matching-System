@@ -30,11 +30,29 @@ app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 // CORS configuration
 const allowedOrigins = env.allowedOrigins;
 
+const isAllowedOrigin = (origin) => {
+    // Allow requests with no origin (mobile apps, curl, same-origin, server-to-server)
+    if (!origin) return true;
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return true;
+    try {
+        const parsed = new URL(origin);
+        // Allow Vercel deployments (*.vercel.app)
+        if (parsed.hostname === 'vercel.app' || parsed.hostname.endsWith('.vercel.app')) {
+            return true;
+        }
+        // Allow local development
+        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+            return true;
+        }
+    } catch (_) {
+        return false;
+    }
+    return false;
+};
+
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, same-origin, server-to-server)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
+        if (isAllowedOrigin(origin)) return callback(null, true);
         return callback(Object.assign(new Error('Origin is not permitted.'), { statusCode: 403 }));
     },
     credentials: true,
