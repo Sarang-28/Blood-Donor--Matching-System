@@ -49,6 +49,7 @@ const getMyMatchAlerts = async (req, res, next) => {
 
 const { fail, createOtp, hashOtp, safeDonor } = require('../utils/security');
 const { getCompatibleDonorGroups } = require('../constants/bloodCompatibility');
+const { isValidCoordinates } = require('../utils/geoUtils');
 async function transaction(work) {
     const client = await db.getClient();
     try { await client.query('BEGIN'); const result = await work(client); await client.query('COMMIT'); return result; }
@@ -179,4 +180,85 @@ const reviewDonor = async (req,res,next) => {
         return apiSuccess(res,result,result.requesterDecision==='approved'?'Donor approved. Your request contact number and destination are now shared with this donor.':'Donor rejected. Contact details remain private.');
     } catch(error) {next(error);}
 };
-module.exports={getMyMatchAlerts,respondToMatch,manualOffer,matchRequest,recordDonation,reviewDonor};
+
+const updateLiveLocation = async (req, res, next) => {
+    try {
+        const { matchId } = req.params;
+        const { latitude, longitude } = req.body;
+        if (!isValidCoordinates(latitude, longitude)) {
+            throw fail('Valid latitude and longitude are required.', 400);
+        }
+        const matchRes = await db.query(`
+            SELECT dm.id FROM donor_matches dm
+            JOIN donors d ON d.id = dm.donor_id
+            JOIN blood_requests br ON br.id = dm.blood_request_id
+            WHERE dm.id = $1 AND d.user_id = $2
+              AND dm.match_status = 'accepted' AND dm.requester_decision = 'approved'
+              AND br.status IN ('active', 'matching')
+        `, [matchId, req.user.id]);
+        if (!matchRes.rowCount) throw fail('Live tracking is not active or authorized for this match.', 403);
+
+        await db.query(`
+            UPDATE donor_matches
+            SET current_latitude = $1, current_longitude = $2, last_tracked_at = NOW()
+            WHERE id = $3
+        `, [latitude, longitude, matchId]);
+
+        return apiSuccess(res, { matchId, latitude, longitude, updated: true }, 'Live location updated.');
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getLiveLocation = async (req, res, next) => {
+    try {
+        const { matchId } = req.params;
+        const matchRes = await db.query(`
+            SELECT
+                dm.id,
+                dm.current_latitude AS latitude,
+                dm.current_longitude AS longitude,
+                dm.last_tracked_at AS "lastTrackedAt",
+                (dm.last_tracked_at IS NOT NULL AND dm.last_tracked_at > NOW() - INTERVAL '2 minutes') AS "isLive",
+                d.full_name AS "donorName",
+                br.hospital_name AS "hospitalName"
+            FROM donor_matches dm
+            JOIN donors d ON d.id = dm.donor_id
+            JOIN blood_requests br ON br.id = dm.blood_request_id
+            WHERE dm.id = $1
+              AND (d.user_id = $2 OR br.requester_user_id = $2)
+              AND dm.match_status = 'accepted' AND dm.requester_decision = 'approved'
+        `, [matchId, req.user.id]);
+        if (!matchRes.rowCount) throw fail('Tracking data not found or unauthorized.', 403);
+
+        const row = matchRes.rows[0];
+        return apiSuccess(res, {
+            matchId: row.id,
+            latitude: row.latitude ? parseFloat(row.latitude) : null,
+            longitude: row.longitude ? parseFloat(row.longitude) : null,
+            lastTrackedAt: row.lastTrackedAt,
+            isLive: row.isLive,
+            donorName: row.donorName,
+            hospitalName: row.hospitalName
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const stopLiveLocation = async (req, res, next) => {
+    try {
+        const { matchId } = req.params;
+        await db.query(`
+            UPDATE donor_matches dm
+            SET current_latitude = NULL, current_longitude = NULL, last_tracked_at = NULL
+            FROM donors d
+            WHERE dm.id = $1 AND dm.donor_id = d.id AND d.user_id = $2
+        `, [matchId, req.user.id]);
+        return apiSuccess(res, { matchId, stopped: true }, 'Live tracking stopped.');
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports={getMyMatchAlerts,respondToMatch,manualOffer,matchRequest,recordDonation,reviewDonor,updateLiveLocation,getLiveLocation,stopLiveLocation};

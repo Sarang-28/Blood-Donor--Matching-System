@@ -67,4 +67,11 @@ router.post(
     matchingController.recordDonation
 );
 
+/**
+ * Live location tracking endpoints (works over HTTP polling on serverless/Vercel)
+ */
+router.post('/:matchId/live-location', authenticateToken, matchingController.updateLiveLocation);
+router.get('/:matchId/live-location', authenticateToken, matchingController.getLiveLocation);
+router.delete('/:matchId/live-location', authenticateToken, matchingController.stopLiveLocation);
+
 module.exports = router;

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Paper, Alert } from '@mui/material';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { useSocket } from '../context/SocketContext';
-
+import api from '../services/api';
 import { mapSettings, validPoint, directionsUrl } from '../config/maps';
 
 const RecenterAutomatically = ({ lat, lng }) => {
@@ -20,19 +20,43 @@ const LiveTrackerMap = ({ matchId, hospitalLat, hospitalLng }) => {
 
   useEffect(() => {
     setDonorLocation(null);
-    if (!socket || !matchId) return;
+    if (!matchId) return;
 
-    socket.emit('join_tracking_room', { matchId, role: 'requester' });
+    let pollTimer = null;
 
-    socket.on('donor_location_updated', (data) => {
-      if (data.matchId !== matchId || !validPoint(data.latitude,data.longitude)) return;
-      setDonorLocation({ lat: data.latitude, lng: data.longitude });
-      setStatusMessage('Live tracking active. Donor location updated recently.');
-    });
+    // 1. Listen via WebSockets if connected
+    if (socket?.connected) {
+      socket.emit('join_tracking_room', { matchId, role: 'requester' });
+      socket.on('donor_location_updated', (data) => {
+        if (data.matchId !== matchId || !validPoint(data.latitude, data.longitude)) return;
+        setDonorLocation({ lat: data.latitude, lng: data.longitude });
+        setStatusMessage('Live tracking active. Donor location updated recently.');
+      });
+    }
+
+    // 2. Poll via REST API (ensures tracking works on Vercel)
+    const fetchLocation = async () => {
+      try {
+        const res = await api.get(`/matches/${matchId}/live-location`);
+        const { latitude, longitude, isLive } = res.data.data;
+        if (validPoint(latitude, longitude)) {
+          setDonorLocation({ lat: latitude, lng: longitude });
+          setStatusMessage(isLive ? 'Live tracking active. Donor location updated recently.' : 'Last reported donor location.');
+        }
+      } catch (err) {
+        // quiet fallback
+      }
+    };
+
+    fetchLocation();
+    pollTimer = setInterval(fetchLocation, 4000);
 
     return () => {
-      socket.off('donor_location_updated');
-      socket.emit('leave_tracking_room', { matchId });
+      if (pollTimer) clearInterval(pollTimer);
+      if (socket?.connected) {
+        socket.off('donor_location_updated');
+        socket.emit('leave_tracking_room', { matchId });
+      }
     };
   }, [socket, matchId]);
 
