@@ -14,7 +14,7 @@ module.exports = {
         password: process.env.DB_PASSWORD || 'postgres',
         database: process.env.DB_NAME || 'blood_donor_db',
         ssl: process.env.DB_SSL === 'true' || process.env.NODE_ENV === 'production'
-            ? { rejectUnauthorized: true, ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA.replace(/\\n/g, '\n') } : {}) } : false,
+            ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false', ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA.replace(/\\n/g, '\n') } : {}) } : false,
     },
 
     jwt: {
@@ -47,5 +47,5 @@ if (module.exports.db.connectionString) {
     const useTls = url.searchParams.has('sslmode') && url.searchParams.get('sslmode') !== 'disable';
     for (const key of ['sslmode', 'sslcert', 'sslkey', 'sslrootcert']) url.searchParams.delete(key);
     module.exports.db.connectionString = url.toString();
-    if (useTls && !module.exports.db.ssl) module.exports.db.ssl = { rejectUnauthorized: true };
+    if (useTls && !module.exports.db.ssl) module.exports.db.ssl = { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
 }
