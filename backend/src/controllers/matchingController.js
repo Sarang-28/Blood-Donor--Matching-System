@@ -66,7 +66,7 @@ async function eligibleDonor(client, userId, request) {
     const result = await client.query(`SELECT *, (last_donation_date IS NULL OR last_donation_date <= CURRENT_DATE - $2::integer) AS eligible
         FROM donors WHERE user_id=$1 FOR UPDATE`, [userId, (await require('../services/settingsService')()).cooldownDays]);
     const d = result.rows[0];
-    if (!d || d.availability_status !== 'Available' || !d.eligible || !d.location_consent || d.age < 18 || d.age > 65 || !d.age || Number(d.weight_kg) < 45 || !getCompatibleDonorGroups(request.blood_group).includes(d.blood_group)) throw fail('Donor is unavailable, incompatible, or outside configured eligibility rules.', 409);
+    if (!d || d.availability_status !== 'Available' || !d.eligible || d.location_consent === false || d.age < 18 || d.age > 65 || !d.age || Number(d.weight_kg) < 45 || !getCompatibleDonorGroups(request.blood_group).includes(d.blood_group)) throw fail('Donor is unavailable, incompatible, or outside configured eligibility rules.', 409);
     return d;
 }
 const respondToMatch = async (req, res, next) => {

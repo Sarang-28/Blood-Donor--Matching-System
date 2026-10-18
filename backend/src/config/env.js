@@ -38,7 +38,7 @@ module.exports = {
 if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET.includes('super_secret'))) {
     throw new Error('Configure a unique JWT_SECRET of at least 32 characters.');
 }
-module.exports.matching = { radiusKm: Number(process.env.MATCH_RADIUS_KM || 10), cooldownDays: Number(process.env.DONATION_COOLDOWN_DAYS || 90) };
+module.exports.matching = { radiusKm: Number(process.env.MATCH_RADIUS_KM || 50), cooldownDays: Number(process.env.DONATION_COOLDOWN_DAYS || 90) };
 if (module.exports.matching.radiusKm < 1 || module.exports.matching.radiusKm > 100 || !Number.isFinite(module.exports.matching.radiusKm) || !Number.isInteger(module.exports.matching.cooldownDays) || module.exports.matching.cooldownDays < 1) throw new Error('Invalid matching configuration');
 module.exports.allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173').split(',').map(value => value.trim());
 // URL TLS parameters override pg SSL options: remove them so certificate verification cannot be disabled.

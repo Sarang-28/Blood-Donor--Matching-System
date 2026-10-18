@@ -247,7 +247,7 @@ const register = async (req, res, next) => {
                     coords.longitude,
                     coords.latitude,
                     lastDonationDate || null,
-                    req.body.locationConsent === true,
+                    req.body.locationConsent !== false,
                 ]
             );
             profileData = donorInsert.rows[0];

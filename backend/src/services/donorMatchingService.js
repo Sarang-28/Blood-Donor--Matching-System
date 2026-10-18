@@ -53,7 +53,7 @@ class DonorMatchingService {
             WHERE
                 u.is_active = TRUE
                 AND d.availability_status = 'Available'
-                AND d.location_consent = TRUE
+                AND (d.location_consent IS NOT FALSE)
                 AND d.age BETWEEN 18 AND 65 AND d.weight_kg >= 45
                 AND (d.last_donation_date IS NULL OR d.last_donation_date <= CURRENT_DATE - $7::integer)
                 AND ($8::text <> 'Critical' OR d.emergency_ready = TRUE)

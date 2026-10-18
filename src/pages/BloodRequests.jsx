@@ -49,9 +49,9 @@ function BloodRequests({ role }) {
     bloodGroup: "O+",
     unitsRequired: 1,
     urgency: "Urgent",
-    hospitalName: profile?.hospital_name || profile?.blood_bank_name || "City General Hospital",
-    locationName: profile?.address || "Pune, Maharashtra",
-    contactPhone: profile?.emergency_contact || profile?.contact_number || "",
+    hospitalName: profile?.hospital_name || profile?.blood_bank_name || "",
+    locationName: profile?.address || profile?.location_name || "",
+    contactPhone: profile?.emergency_contact || profile?.contact_number || user?.phone || "",
     notes: "",
   });
 

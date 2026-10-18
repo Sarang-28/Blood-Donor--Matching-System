@@ -141,17 +141,23 @@ const getAllRequests = async (req, res, next) => {
         let sql = `
             SELECT
                 br.id,
+                br.patient_name AS "patientName",
+                br.patient_name,
                 br.blood_group AS "bloodGroup",
                 br.hospital_name AS hospital,
-                'Destination shared after requester approval' AS location,
+                br.hospital_name AS "hospitalName",
+                br.location_name AS location,
+                br.location_name AS "locationName",
                 CONCAT(br.units_required, ' Unit', CASE WHEN br.units_required > 1 THEN 's' ELSE '' END) AS units,
                 br.units_required AS "unitsRequired",
                 br.units_fulfilled AS "unitsFulfilled",
                 br.urgency,
                 br.status,
-
+                br.contact_phone AS "contactPhone",
+                br.notes,
                 br.requester_user_id AS "requesterUserId",
-                br.created_at AS "createdAt"
+                br.created_at AS "createdAt",
+                br.created_at
             FROM blood_requests br
             WHERE (br.required_before IS NULL OR br.required_before > NOW() OR br.status NOT IN ('active','matching'))
         `;
@@ -177,7 +183,9 @@ const getAllRequests = async (req, res, next) => {
         if (search) {
             values.push(`%${search.toLowerCase()}%`);
             sql += ` AND (
-                LOWER(br.hospital_name) LIKE $${values.length}
+                LOWER(br.hospital_name) LIKE $${values.length} OR
+                LOWER(br.patient_name) LIKE $${values.length} OR
+                LOWER(br.location_name) LIKE $${values.length}
             )`;
         }
 

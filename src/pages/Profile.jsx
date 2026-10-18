@@ -448,6 +448,23 @@ function AccountProfile({ role }) {
                           }
                         />
                       </Grid>
+
+                      <Grid size={{ xs: 12 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={formData.locationConsent !== false}
+                              onChange={handleSwitchChange("locationConsent")}
+                              color="error"
+                            />
+                          }
+                          label={
+                            <Typography variant="body2" fontWeight={600}>
+                              Hyperlocal Matching & Notification Consent (Allow system to notify you of nearby emergency blood requests)
+                            </Typography>
+                          }
+                        />
+                      </Grid>
                     </>
                   )}
 
