@@ -1,10 +1,10 @@
-CREATE TABLE ngos (
+CREATE TABLE IF NOT EXISTS ngos (
  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  ngo_name TEXT NOT NULL, registration_number TEXT UNIQUE NOT NULL, coordinator_name TEXT NOT NULL, contact_number TEXT NOT NULL,
  address TEXT NOT NULL, service_area TEXT NOT NULL DEFAULT '', geom GEOMETRY(Point,4326) NOT NULL,
  verification_status verification_status NOT NULL DEFAULT 'pending', verified_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE TABLE request_assignments (
+CREATE TABLE IF NOT EXISTS request_assignments (
  blood_request_id UUID NOT NULL REFERENCES blood_requests(id) ON DELETE CASCADE, ngo_id UUID NOT NULL REFERENCES ngos(id) ON DELETE CASCADE,
  assigned_by UUID NOT NULL REFERENCES users(id), created_at TIMESTAMPTZ DEFAULT NOW(), PRIMARY KEY(blood_request_id,ngo_id)
 );
